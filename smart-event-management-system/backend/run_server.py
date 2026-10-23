@@ -139,6 +139,7 @@ if __name__ == "__main__":
     reload_enabled = "--reload" in sys.argv or os.environ.get("RELOAD", "true").lower() in ("true", "1", "yes")
 
     active_port = resolve_available_port(configured_port, host)
+    update_frontend_api_port(active_port)
 
     print("=" * 60)
     print(" EventSphere Backend Server Starting")
