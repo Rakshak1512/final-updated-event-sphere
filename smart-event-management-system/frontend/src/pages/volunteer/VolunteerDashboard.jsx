@@ -26,6 +26,7 @@ import PageTransition from "../../components/common/PageTransition.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { volunteerService } from "../../api/services.js";
 import { generateVolunteerScansPDF } from "../../utils/pdfReportGenerator.js";
+import { Html5Qrcode } from "html5-qrcode";
 
 export default function VolunteerDashboard() {
   const { user } = useAuth();
@@ -122,11 +123,21 @@ export default function VolunteerDashboard() {
     } catch (e) {}
   };
 
+  // Prevent background scrolling when scanner modal is active
+  useEffect(() => {
+    if (scannerOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+  }, [scannerOpen]);
+
   // Enumerate cameras and filter exclusively for the primary standard Front and Back cameras
   // Ignores wide-angle, ultra-wide, telephoto, macro, virtual, or depth cameras
   const resolveLogicalCameras = async () => {
     try {
-      const { Html5Qrcode } = await import("html5-qrcode");
       const devices = await Html5Qrcode.getCameras();
       if (!devices || devices.length === 0) {
         return { backId: null, frontId: null, frontOk: true, backOk: true };
@@ -208,9 +219,17 @@ export default function VolunteerDashboard() {
       : (backCameraIdRef.current ? { deviceId: { exact: backCameraIdRef.current } } : { facingMode: "environment" });
 
     const qrConfig = {
-      fps: 10,
-      qrbox: { width: 250, height: 250 },
+      fps: 20,
+      qrbox: (viewfinderWidth, viewfinderHeight) => {
+        const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+        const edgeSize = Math.floor(minEdge * 0.82);
+        return {
+          width: Math.max(edgeSize, 200),
+          height: Math.max(edgeSize, 200),
+        };
+      },
       aspectRatio: 1.0,
+      disableFlip: choice === "back",
     };
 
     try {
@@ -271,36 +290,35 @@ export default function VolunteerDashboard() {
     if (scannerOpen && scannerMode === "camera" && !verifiedAttendee && !confirmedSuccess) {
       const startScanner = async () => {
         try {
-          const { Html5Qrcode } = await import("html5-qrcode");
           if (!isMounted || !document.getElementById("qr-reader-box")) return;
 
           // Stop existing stream if any
           await stopActiveStream();
-
-          // Enumerate to pick primary Back & Front cameras (filtering out wide/tele/ultra)
-          const { backId, frontId, frontOk, backOk } = await resolveLogicalCameras();
-          if (isMounted) {
-            backCameraIdRef.current = backId;
-            frontCameraIdRef.current = frontId;
-            setHasFrontCamera(frontOk);
-            setHasBackCamera(backOk);
-          }
 
           const scanner = new Html5Qrcode("qr-reader-box");
           html5QrCodeInstance.current = scanner;
 
           if (isMounted) {
             // Default to Back camera for QR scanning on mobile & all devices
-            const initialChoice = backOk ? "back" : (frontOk ? "front" : "back");
-            setCameraChoice(initialChoice);
+            const initialChoice = cameraChoice || "back";
             await startCameraStream(scanner, initialChoice);
           }
+
+          // Asynchronously resolve logical cameras in background so switcher is ready
+          resolveLogicalCameras().then(({ backId, frontId, frontOk, backOk }) => {
+            if (isMounted) {
+              backCameraIdRef.current = backId;
+              frontCameraIdRef.current = frontId;
+              setHasFrontCamera(frontOk);
+              setHasBackCamera(backOk);
+            }
+          }).catch(() => {});
         } catch (e) {
           console.log("Camera scanner initialization error:", e);
         }
       };
 
-      const timer = setTimeout(startScanner, 200);
+      const timer = setTimeout(startScanner, 20);
       return () => {
         isMounted = false;
         clearTimeout(timer);
@@ -333,7 +351,6 @@ export default function VolunteerDashboard() {
       await stopActiveStream();
       setCameraChoice(targetChoice);
 
-      const { Html5Qrcode } = await import("html5-qrcode");
       let scanner = html5QrCodeInstance.current;
       if (!scanner) {
         scanner = new Html5Qrcode("qr-reader-box");
@@ -387,7 +404,6 @@ export default function VolunteerDashboard() {
         } catch (e) {}
       }
 
-      const { Html5Qrcode } = await import("html5-qrcode");
       let scanner = html5QrCodeInstance.current;
       if (!scanner) {
         scanner = new Html5Qrcode("qr-reader-box");
@@ -443,6 +459,12 @@ export default function VolunteerDashboard() {
       toast.error("Please enter or scan a ticket code");
       return;
     }
+
+    try {
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        navigator.vibrate(60);
+      }
+    } catch (e) {}
 
     setVerifying(true);
     setVerifyError(null);
@@ -1056,158 +1078,203 @@ export default function VolunteerDashboard() {
           })()}
         </div>
 
-        {/* QR SCANNER & ATTENDEE VERIFICATION MODAL */}
+        {/* QR SCANNER & ATTENDEE VERIFICATION MODAL - ZERO SCROLL OPTIMIZED */}
         <AnimatePresence>
           {scannerOpen && (
             <div
               style={{
                 position: "fixed",
                 inset: 0,
-                background: "rgba(3, 7, 18, 0.8)",
-                backdropFilter: "blur(8px)",
-                WebkitBackdropFilter: "blur(8px)",
+                background: "rgba(3, 7, 18, 0.85)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                zIndex: 999,
-                padding: "calc(env(safe-area-inset-top, 16px) + 10px) calc(env(safe-area-inset-right, 16px) + 8px) calc(env(safe-area-inset-bottom, 16px) + 10px) calc(env(safe-area-inset-left, 16px) + 8px)",
+                zIndex: 9999,
+                padding: "clamp(6px, 2vw, 16px)",
                 boxSizing: "border-box",
               }}
             >
               <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                transition={{ duration: 0.2 }}
                 className="glass-card"
                 style={{
                   width: "100%",
-                  maxWidth: 540,
+                  maxWidth: 480,
+                  maxHeight: "94dvh",
                   background: "var(--bg-elevated)",
-                  borderRadius: 24,
-                  border: "1.5px solid rgba(139, 92, 246, 0.3)",
-                  boxShadow: "0 25px 60px rgba(0,0,0,0.5)",
-                  overflow: "hidden",
+                  borderRadius: 20,
+                  border: "1.5px solid rgba(139, 92, 246, 0.35)",
+                  boxShadow: "0 25px 60px rgba(0,0,0,0.6)",
                   display: "flex",
                   flexDirection: "column",
-                  maxHeight: "calc(100dvh - 36px)",
+                  overflow: "hidden",
                   boxSizing: "border-box",
                 }}
               >
-                {/* Modal Header */}
+                {/* Slim Header: zero wasted space */}
                 <div
                   style={{
-                    padding: "clamp(12px, 3vw, 20px) clamp(14px, 3.5vw, 24px)",
+                    padding: "10px 16px",
                     borderBottom: "1px solid var(--border-color)",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
                     background: "var(--bg-glass)",
+                    flexShrink: 0,
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div
                       style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 10,
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
                         background: "var(--gradient-primary)",
                         color: "#fff",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        flexShrink: 0,
                       }}
                     >
-                      <FiCamera size={18} />
+                      <FiCamera size={16} />
                     </div>
                     <div>
-                      <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Registration QR Scanner</h3>
-                      <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>
-                        {selectedEventId
-                          ? `Restricted to Event #${selectedEventId}`
-                          : "Scanning for all active campus events"}
-                      </p>
+                      <div style={{ fontSize: 15, fontWeight: 700, margin: 0, color: "var(--text-primary)", lineHeight: 1.2 }}>
+                        QR Ticket Scanner
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)", margin: 0 }}>
+                        {selectedEventId ? `Event #${selectedEventId}` : "All Active Events"}
+                      </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      stopActiveStream();
-                      setScannerOpen(false);
-                    }}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "var(--text-secondary)",
-                      cursor: "pointer",
-                      padding: 4,
-                    }}
-                  >
-                    <FiX size={20} />
-                  </button>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {scannerMode === "camera" && !verifiedAttendee && !confirmedSuccess && (
+                      <button
+                        type="button"
+                        onClick={handleSwitchCamera}
+                        disabled={switchingCamera || cameraLoading}
+                        className="btn btn-sm btn-outline"
+                        style={{
+                          padding: "4px 10px",
+                          fontSize: 11.5,
+                          borderRadius: 8,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 5,
+                        }}
+                        title="Toggle Front / Back Camera"
+                      >
+                        <FiRepeat size={12} className={switchingCamera ? "spin-icon" : ""} />
+                        <span>{cameraChoice === "back" ? "Back Cam" : "Front Cam"}</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        stopActiveStream();
+                        setScannerOpen(false);
+                      }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--text-secondary)",
+                        cursor: "pointer",
+                        padding: 4,
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                      aria-label="Close scanner"
+                    >
+                      <FiX size={20} />
+                    </button>
+                  </div>
                 </div>
 
-                {/* Modal Body */}
-                <div style={{ padding: "clamp(14px, 3.5vw, 24px)", overflowY: "auto" }}>
-                  {/* STATE 1: SUCCESS CONFIRMATION */}
+                {/* Modal Body: Compact, Fits 100% on Screen with No Scrolling */}
+                <div
+                  style={{
+                    padding: "12px 14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                    overflowY: "auto",
+                  }}
+                >
+                  {/* STATE 1: ATTENDANCE CONFIRMED SUCCESS */}
                   {confirmedSuccess && (
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
+                      initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      style={{ textAlign: "center", padding: "20px 0" }}
+                      style={{ textAlign: "center", padding: "16px 8px" }}
                     >
                       <div
                         style={{
-                          width: 72,
-                          height: 72,
+                          width: 58,
+                          height: 58,
                           borderRadius: "50%",
                           background: "rgba(16, 185, 129, 0.15)",
                           color: "#10b981",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          fontSize: 36,
-                          margin: "0 auto 16px",
+                          fontSize: 28,
+                          margin: "0 auto 10px",
                           border: "2px solid #10b981",
                         }}
                       >
                         <FiCheck />
                       </div>
-                      <h3 style={{ fontSize: 22, fontWeight: 800, color: "#10b981", margin: "0 0 6px 0" }}>
+                      <h3 style={{ fontSize: 19, fontWeight: 800, color: "#10b981", margin: "0 0 4px 0" }}>
                         Attendance Confirmed!
                       </h3>
-                      <p style={{ fontSize: 14.5, color: "var(--text-primary)", fontWeight: 600, margin: "0 0 4px 0" }}>
+                      <p style={{ fontSize: 14, color: "var(--text-primary)", fontWeight: 700, margin: "0 0 2px 0" }}>
                         {confirmedSuccess.student_name} ({confirmedSuccess.registration_number || "Student"})
                       </p>
-                      <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 20px 0" }}>
+                      <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: "0 0 16px 0" }}>
                         {confirmedSuccess.event_title} • {confirmedSuccess.checked_in_at}
                       </p>
                       <button
+                        type="button"
                         onClick={handleResetScanner}
                         className="btn btn-primary"
-                        style={{ width: "100%", padding: "12px", fontSize: 15, fontWeight: 700, borderRadius: 12 }}
+                        style={{
+                          width: "100%",
+                          padding: "12px",
+                          fontSize: 14.5,
+                          fontWeight: 700,
+                          borderRadius: 12,
+                        }}
                       >
                         Scan Next Attendee
                       </button>
                     </motion.div>
                   )}
 
-                  {/* STATE 2: ATTENDEE VERIFIED (CONFIRMATION PROMPT) */}
+                  {/* STATE 2: ATTENDEE VERIFIED (CONFIRMATION CARD) */}
                   {!confirmedSuccess && verifiedAttendee && (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
                       <div
                         style={{
                           background: "var(--bg-base)",
-                          borderRadius: 16,
-                          padding: "20px",
+                          borderRadius: 14,
+                          padding: "14px",
                           border: "1px solid var(--border-color)",
-                          marginBottom: 20,
+                          marginBottom: 12,
                         }}
                       >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                           <div>
-                            <span style={{ fontSize: 11.5, color: "var(--text-muted)", textTransform: "uppercase" }}>
+                            <span style={{ fontSize: 10.5, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                               Attendee Verification
                             </span>
-                            <h4 style={{ fontSize: 18, fontWeight: 800, margin: "2px 0 0 0", color: "var(--text-primary)" }}>
+                            <h4 style={{ fontSize: 17, fontWeight: 800, margin: "2px 0 0 0", color: "var(--text-primary)" }}>
                               {verifiedAttendee.student_name}
                             </h4>
                           </div>
@@ -1217,7 +1284,7 @@ export default function VolunteerDashboard() {
                               borderRadius: 999,
                               background: verifiedAttendee.already_attended ? "rgba(239, 68, 68, 0.15)" : "rgba(16, 185, 129, 0.15)",
                               color: verifiedAttendee.already_attended ? "#ef4444" : "#10b981",
-                              fontSize: 12,
+                              fontSize: 11.5,
                               fontWeight: 700,
                             }}
                           >
@@ -1225,80 +1292,75 @@ export default function VolunteerDashboard() {
                           </span>
                         </div>
 
-                        <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
-                          <tbody>
-                            <tr>
-                              <td style={{ color: "var(--text-muted)", padding: "4px 0" }}>Reg No:</td>
-                              <td style={{ color: "var(--text-primary)", fontWeight: 600, fontFamily: "monospace" }}>
-                                {verifiedAttendee.registration_number || "N/A"}
-                              </td>
-                            </tr>
-                            <tr>
-                              <td style={{ color: "var(--text-muted)", padding: "4px 0" }}>Department:</td>
-                              <td style={{ color: "var(--text-primary)" }}>{verifiedAttendee.department || "N/A"}</td>
-                            </tr>
-                            <tr>
-                              <td style={{ color: "var(--text-muted)", padding: "4px 0" }}>Event:</td>
-                              <td style={{ color: "var(--text-primary)", fontWeight: 600 }}>{verifiedAttendee.event_title}</td>
-                            </tr>
-                            <tr>
-                              <td style={{ color: "var(--text-muted)", padding: "4px 0" }}>Date & Venue:</td>
-                              <td style={{ color: "var(--text-secondary)" }}>
-                                {verifiedAttendee.event_date} ({verifiedAttendee.venue})
-                              </td>
-                            </tr>
-                            {verifiedAttendee.team_name && (
-                              <tr>
-                                <td style={{ color: "var(--text-muted)", padding: "4px 0" }}>Team:</td>
-                                <td style={{ color: "var(--text-primary)", fontWeight: 600 }}>{verifiedAttendee.team_name}</td>
-                              </tr>
-                            )}
-                            <tr>
-                              <td style={{ color: "var(--text-muted)", padding: "4px 0" }}>Ticket Code:</td>
-                              <td style={{ fontFamily: "monospace", color: "#a5b4fc" }}>#{verifiedAttendee.ticket_code}</td>
-                            </tr>
-                          </tbody>
-                        </table>
+                        {/* 2x2 Grid Info: Compact, zero scroll */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 12px", fontSize: 12 }}>
+                          <div>
+                            <span style={{ color: "var(--text-muted)", fontSize: 10.5, display: "block" }}>Reg No</span>
+                            <strong style={{ color: "var(--text-primary)", fontFamily: "monospace" }}>
+                              {verifiedAttendee.registration_number || "N/A"}
+                            </strong>
+                          </div>
+                          <div>
+                            <span style={{ color: "var(--text-muted)", fontSize: 10.5, display: "block" }}>Department</span>
+                            <strong style={{ color: "var(--text-primary)" }}>
+                              {verifiedAttendee.department || "General"}
+                            </strong>
+                          </div>
+                          <div>
+                            <span style={{ color: "var(--text-muted)", fontSize: 10.5, display: "block" }}>Event</span>
+                            <strong style={{ color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
+                              {verifiedAttendee.event_title}
+                            </strong>
+                          </div>
+                          <div>
+                            <span style={{ color: "var(--text-muted)", fontSize: 10.5, display: "block" }}>Ticket Code</span>
+                            <strong style={{ color: "#a5b4fc", fontFamily: "monospace" }}>
+                              #{verifiedAttendee.ticket_code}
+                            </strong>
+                          </div>
+                        </div>
                       </div>
 
-                      {verifiedAttendee.already_attended ? (
+                      {verifiedAttendee.already_attended && (
                         <div
                           style={{
-                            padding: "14px",
-                            borderRadius: 12,
+                            padding: "8px 12px",
+                            borderRadius: 10,
                             background: "rgba(239, 68, 68, 0.1)",
                             border: "1px solid rgba(239, 68, 68, 0.3)",
                             color: "#fca5a5",
-                            fontSize: 13,
-                            marginBottom: 20,
+                            fontSize: 12,
+                            marginBottom: 10,
                           }}
                         >
-                          ⚠️ Attendance was already confirmed at {verifiedAttendee.checked_in_at || "previously"} by{" "}
-                          {verifiedAttendee.checked_in_by || "staff"}.
+                          ⚠️ Checked in at {verifiedAttendee.checked_in_at || "previously"} by {verifiedAttendee.checked_in_by || "staff"}.
                         </div>
-                      ) : null}
+                      )}
 
-                      <div style={{ display: "flex", gap: 12 }}>
+                      <div style={{ display: "flex", gap: 10 }}>
                         <button
+                          type="button"
                           onClick={handleResetScanner}
-                          className="btn btn-outline"
-                          style={{ flex: 1, padding: "12px", borderRadius: 12 }}
+                          className="btn btn-outline btn-sm"
+                          style={{ flex: 1, padding: "10px", borderRadius: 10, fontSize: 13 }}
                         >
-                          Cancel / Scan Next
+                          Cancel / Next
                         </button>
                         <button
+                          type="button"
                           onClick={handleConfirmAttendance}
                           disabled={confirming || verifiedAttendee.already_attended}
                           className="btn btn-primary"
                           style={{
                             flex: 2,
-                            padding: "12px",
-                            borderRadius: 12,
+                            padding: "10px",
+                            borderRadius: 10,
                             fontWeight: 700,
+                            fontSize: 13.5,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            gap: 8,
+                            gap: 6,
                           }}
                         >
                           {confirming ? "Confirming..." : "✓ Confirm Attendance"}
@@ -1310,8 +1372,8 @@ export default function VolunteerDashboard() {
                   {/* STATE 3: LIVE SCANNER / CODE ENTRY */}
                   {!confirmedSuccess && !verifiedAttendee && (
                     <div>
-                      {/* Mode Switcher Tabs */}
-                      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                      {/* Compact Mode Switcher */}
+                      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
                         <button
                           type="button"
                           onClick={() => {
@@ -1321,8 +1383,9 @@ export default function VolunteerDashboard() {
                           className="btn btn-sm"
                           style={{
                             flex: 1,
-                            padding: "8px 12px",
-                            borderRadius: 10,
+                            padding: "6px 10px",
+                            borderRadius: 8,
+                            fontSize: 12,
                             background: scannerMode === "camera" ? "var(--gradient-primary)" : "var(--bg-glass)",
                             color: scannerMode === "camera" ? "#ffffff" : "var(--text-secondary)",
                             border: scannerMode === "camera" ? "none" : "1px solid var(--border-color)",
@@ -1330,10 +1393,10 @@ export default function VolunteerDashboard() {
                             display: "inline-flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            gap: 6,
+                            gap: 5,
                           }}
                         >
-                          <FiCamera size={15} /> Live Camera Scan
+                          <FiCamera size={13} /> Live Camera
                         </button>
                         <button
                           type="button"
@@ -1344,8 +1407,9 @@ export default function VolunteerDashboard() {
                           className="btn btn-sm"
                           style={{
                             flex: 1,
-                            padding: "8px 12px",
-                            borderRadius: 10,
+                            padding: "6px 10px",
+                            borderRadius: 8,
+                            fontSize: 12,
                             background: scannerMode === "upload" ? "var(--gradient-primary)" : "var(--bg-glass)",
                             color: scannerMode === "upload" ? "#ffffff" : "var(--text-secondary)",
                             border: scannerMode === "upload" ? "none" : "1px solid var(--border-color)",
@@ -1353,213 +1417,67 @@ export default function VolunteerDashboard() {
                             display: "inline-flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            gap: 6,
+                            gap: 5,
                           }}
                         >
-                          <FiUpload size={15} /> Upload QR Image
+                          <FiUpload size={13} /> Upload QR
                         </button>
                       </div>
 
                       {/* MODE A: LIVE CAMERA */}
                       {scannerMode === "camera" && (
                         <div>
-                          {/* Camera Controls Toolbar: Exclusively Front Camera & Back Camera */}
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              flexWrap: "wrap",
-                              gap: 10,
-                              marginBottom: 12,
-                              padding: "0 2px",
-                            }}
-                          >
-                            {/* Strictly two options: Back Camera and Front Camera */}
-                            <div
-                              style={{
-                                display: "inline-flex",
-                                gap: 4,
-                                background: "var(--bg-glass)",
-                                padding: 4,
-                                borderRadius: 12,
-                                border: "1px solid var(--border-color)",
-                              }}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => handleSelectCamera("back")}
-                                disabled={switchingCamera || cameraLoading || !hasBackCamera}
-                                style={{
-                                  padding: "6px 14px",
-                                  borderRadius: 8,
-                                  fontSize: 12.5,
-                                  fontWeight: cameraChoice === "back" ? 700 : 500,
-                                  background: cameraChoice === "back" ? "var(--gradient-primary)" : "transparent",
-                                  color: cameraChoice === "back" ? "#ffffff" : "var(--text-secondary)",
-                                  border: "none",
-                                  cursor: hasBackCamera ? "pointer" : "not-allowed",
-                                  opacity: hasBackCamera ? 1 : 0.45,
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 6,
-                                  transition: "all 0.2s ease",
-                                }}
-                                title="Use Back Camera (Recommended for QR scanning)"
-                              >
-                                <FiCamera size={14} /> Back Camera
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleSelectCamera("front")}
-                                disabled={switchingCamera || cameraLoading || !hasFrontCamera}
-                                style={{
-                                  padding: "6px 14px",
-                                  borderRadius: 8,
-                                  fontSize: 12.5,
-                                  fontWeight: cameraChoice === "front" ? 700 : 500,
-                                  background: cameraChoice === "front" ? "var(--gradient-primary)" : "transparent",
-                                  color: cameraChoice === "front" ? "#ffffff" : "var(--text-secondary)",
-                                  border: "none",
-                                  cursor: hasFrontCamera ? "pointer" : "not-allowed",
-                                  opacity: hasFrontCamera ? 1 : 0.45,
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 6,
-                                  transition: "all 0.2s ease",
-                                }}
-                                title={hasFrontCamera ? "Use Front Camera" : "Front camera not detected on this device"}
-                              >
-                                <FiUser size={14} /> Front Camera
-                                {!hasFrontCamera && (
-                                  <span style={{ fontSize: 10, opacity: 0.7 }}>(N/A)</span>
-                                )}
-                              </button>
-                            </div>
-
-                            {/* Switch Camera Button */}
-                            <button
-                              type="button"
-                              onClick={handleSwitchCamera}
-                              disabled={switchingCamera || cameraLoading || (!hasFrontCamera && !hasBackCamera)}
-                              className="btn btn-sm btn-outline"
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 6,
-                                padding: "7px 14px",
-                                borderRadius: 10,
-                                fontSize: 12.5,
-                                fontWeight: 600,
-                                minHeight: 34,
-                              }}
-                              title="Toggle between Front and Back camera"
-                            >
-                              <FiRepeat size={13} className={switchingCamera ? "spin-icon" : ""} />
-                              {switchingCamera ? "Switching..." : "Switch Camera"}
-                            </button>
-                          </div>
-
-                          {/* Active Camera Indicator */}
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              marginBottom: 10,
-                              fontSize: 12,
-                              color: "var(--text-secondary)",
-                              padding: "0 2px",
-                            }}
-                          >
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                              <span
-                                style={{
-                                  width: 8,
-                                  height: 8,
-                                  borderRadius: "50%",
-                                  background: cameraError ? "var(--danger)" : "#10b981",
-                                  boxShadow: cameraError
-                                    ? "0 0 8px rgba(239, 68, 68, 0.6)"
-                                    : "0 0 8px rgba(16, 185, 129, 0.6)",
-                                  display: "inline-block",
-                                }}
-                              />
-                              {cameraError
-                                ? "Camera Inactive"
-                                : cameraChoice === "back"
-                                ? "Active: Back Camera (Default for QR)"
-                                : "Active: Front Camera"}
-                            </span>
-
-                            {!hasFrontCamera && (
-                              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                                Front camera unavailable on this device
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Error Notice with Quick Actions */}
                           {cameraError && (
                             <div
                               style={{
-                                padding: "14px",
-                                borderRadius: 14,
+                                padding: "10px 12px",
+                                borderRadius: 10,
                                 background: "rgba(239, 68, 68, 0.1)",
                                 border: "1px solid rgba(239, 68, 68, 0.3)",
                                 color: "#fca5a5",
-                                fontSize: 12.5,
-                                marginBottom: 14,
+                                fontSize: 12,
+                                marginBottom: 10,
                               }}
                             >
                               <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, marginBottom: 4 }}>
-                                <FiAlertCircle size={15} /> Camera Notice
+                                <FiAlertCircle size={14} /> Camera Notice
                               </div>
-                              <div style={{ marginBottom: 10 }}>{cameraError}</div>
-                              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              <div style={{ marginBottom: 8 }}>{cameraError}</div>
+                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                 <button
                                   type="button"
                                   onClick={() => handleSelectCamera(cameraChoice)}
                                   className="btn btn-sm btn-outline"
-                                  style={{ fontSize: 11.5, padding: "5px 12px", borderColor: "rgba(239, 68, 68, 0.4)" }}
+                                  style={{ fontSize: 11, padding: "4px 10px" }}
                                 >
-                                  <FiRefreshCw size={12} /> Retry Camera
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleSwitchCamera}
-                                  className="btn btn-sm btn-outline"
-                                  style={{ fontSize: 11.5, padding: "5px 12px", borderColor: "rgba(239, 68, 68, 0.4)" }}
-                                >
-                                  <FiRepeat size={12} /> Switch to {cameraChoice === "back" ? "Front" : "Back"} Camera
+                                  <FiRefreshCw size={11} /> Retry
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setScannerMode("upload")}
                                   className="btn btn-sm btn-primary"
-                                  style={{ fontSize: 11.5, padding: "5px 12px" }}
+                                  style={{ fontSize: 11, padding: "4px 10px" }}
                                 >
-                                  <FiUpload size={12} /> Upload QR Image Instead
+                                  <FiUpload size={11} /> Upload QR
                                 </button>
                               </div>
                             </div>
                           )}
 
-                          {/* Live Camera Viewfinder Box */}
+                          {/* Front-and-Center Live Camera Viewfinder Box (No Scroll Needed!) */}
                           <div
                             id="qr-reader-box"
                             style={{
                               width: "100%",
-                              minHeight: 250,
+                              height: "clamp(210px, 34vh, 270px)",
                               background: "#000",
-                              borderRadius: 16,
+                              borderRadius: 14,
                               overflow: "hidden",
-                              marginBottom: 16,
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
-                              border: "1.5px dashed rgba(139, 92, 246, 0.4)",
+                              border: "1.5px solid rgba(139, 92, 246, 0.5)",
+                              position: "relative",
                             }}
                           />
                         </div>
@@ -1592,85 +1510,80 @@ export default function VolunteerDashboard() {
                               }}
                               style={{
                                 border: "2px dashed rgba(139, 92, 246, 0.5)",
-                                borderRadius: 16,
-                                padding: "32px 16px",
+                                borderRadius: 14,
+                                padding: "24px 14px",
                                 textAlign: "center",
                                 cursor: "pointer",
                                 background: "rgba(139, 92, 246, 0.05)",
                                 transition: "all 0.2s ease",
-                                marginBottom: 16,
                               }}
                             >
                               <div
                                 style={{
-                                  width: 48,
-                                  height: 48,
+                                  width: 40,
+                                  height: 40,
                                   borderRadius: "50%",
                                   background: "rgba(139, 92, 246, 0.15)",
                                   color: "#8b5cf6",
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "center",
-                                  margin: "0 auto 10px",
-                                  fontSize: 22,
+                                  margin: "0 auto 8px",
+                                  fontSize: 18,
                                 }}
                               >
                                 <FiUpload />
                               </div>
-                              <h4 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 4px 0", color: "var(--text-primary)" }}>
+                              <h4 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 2px 0", color: "var(--text-primary)" }}>
                                 Select or Drop QR Code Image
                               </h4>
-                              <p style={{ fontSize: 12.5, color: "var(--text-secondary)", margin: "0 0 10px 0" }}>
-                                Tap to pick from gallery or drag a QR code screenshot here
+                              <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: 0 }}>
+                                Tap to pick screenshot or image from gallery
                               </p>
-                              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                                PNG, JPG, JPEG, and WebP (up to 10MB)
-                              </span>
                             </div>
                           ) : (
                             <div
                               style={{
-                                borderRadius: 16,
-                                padding: 14,
+                                borderRadius: 14,
+                                padding: 12,
                                 background: "var(--bg-glass)",
                                 border: "1px solid var(--border-color)",
-                                marginBottom: 16,
                                 display: "flex",
                                 alignItems: "center",
-                                gap: 14,
+                                gap: 12,
                               }}
                             >
                               <img
                                 src={uploadedPreview}
                                 alt="QR Preview"
                                 style={{
-                                  width: 72,
-                                  height: 72,
+                                  width: 60,
+                                  height: 60,
                                   objectFit: "cover",
-                                  borderRadius: 12,
+                                  borderRadius: 10,
                                   border: "1px solid var(--border-color)",
                                 }}
                               />
                               <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 2 }}>
+                                <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-primary)", marginBottom: 2 }}>
                                   {uploadedFile?.name || "QR Image"}
                                 </div>
-                                <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginBottom: 8 }}>
+                                <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginBottom: 6 }}>
                                   {decodingFile ? (
                                     <span style={{ color: "#8b5cf6", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                                      <FiRefreshCw className="spin-icon" size={12} /> Analyzing QR Code...
+                                      <FiRefreshCw className="spin-icon" size={11} /> Decoding...
                                     </span>
                                   ) : (
-                                    "Image ready for validation"
+                                    "Ready to verify"
                                   )}
                                 </div>
                                 <button
                                   type="button"
                                   onClick={handleClearUploadedFile}
                                   className="btn btn-sm btn-outline"
-                                  style={{ fontSize: 11.5, padding: "4px 10px", borderRadius: 8 }}
+                                  style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6 }}
                                 >
-                                  Remove / Replace Image
+                                  Replace
                                 </button>
                               </div>
                             </div>
@@ -1681,53 +1594,71 @@ export default function VolunteerDashboard() {
                       {verifyError && (
                         <div
                           style={{
-                            padding: "12px 16px",
-                            borderRadius: 12,
+                            padding: "8px 12px",
+                            borderRadius: 10,
                             background: "rgba(239, 68, 68, 0.1)",
                             border: "1px solid rgba(239, 68, 68, 0.3)",
                             color: "#fca5a5",
-                            fontSize: 13,
-                            marginBottom: 16,
+                            fontSize: 12,
+                            marginTop: 8,
                             display: "flex",
                             alignItems: "center",
-                            gap: 8,
+                            gap: 6,
                           }}
                         >
-                          <FiAlertCircle size={16} /> {verifyError}
+                          <FiAlertCircle size={14} /> {verifyError}
                         </div>
                       )}
 
-                      {/* Manual Code Input Fallback */}
-                      <div>
-                        <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>
-                          Or Enter Ticket Code Manually
-                        </label>
-                        <div style={{ display: "flex", gap: 8 }}>
+                      {/* Fast Manual Code Entry Row directly under the scanner without taking vertical space */}
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ display: "flex", gap: 6 }}>
                           <input
                             type="text"
                             className="form-input"
-                            placeholder="e.g. ESP-123456 or REG-123"
+                            placeholder="Or type code (e.g. ESP-12345)..."
                             value={manualCode}
                             onChange={(e) => setManualCode(e.target.value)}
                             onKeyDown={(e) => {
                               if (e.key === "Enter") handleVerifyTicket();
                             }}
-                            style={{ flex: 1 }}
+                            style={{ flex: 1, padding: "7px 12px", fontSize: 12.5, height: 36 }}
                           />
                           <button
                             type="button"
                             onClick={() => handleVerifyTicket()}
                             disabled={verifying || !manualCode.trim()}
-                            className="btn btn-primary"
-                            style={{ padding: "0 18px", fontWeight: 600 }}
+                            className="btn btn-primary btn-sm"
+                            style={{ padding: "0 14px", fontWeight: 700, height: 36, fontSize: 12.5 }}
                           >
-                            {verifying ? "Verifying..." : "Verify"}
+                            {verifying ? "Checking..." : "Verify"}
                           </button>
                         </div>
                       </div>
                     </div>
                   )}
                 </div>
+
+                <style>{`
+                  #qr-reader-box {
+                    border: none !important;
+                  }
+                  #qr-reader-box video {
+                    width: 100% !important;
+                    height: 100% !important;
+                    max-height: clamp(210px, 34vh, 270px) !important;
+                    object-fit: cover !important;
+                    border-radius: 14px !important;
+                  }
+                  #qr-reader-box__scan_region {
+                    min-height: 190px !important;
+                    background: transparent !important;
+                  }
+                  #qr-reader-box__dashboard_section,
+                  #qr-reader-box__header_message {
+                    display: none !important;
+                  }
+                `}</style>
               </motion.div>
             </div>
           )}
