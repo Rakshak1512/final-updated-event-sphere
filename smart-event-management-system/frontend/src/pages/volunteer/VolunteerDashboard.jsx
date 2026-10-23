@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import {
@@ -1136,43 +1137,60 @@ export default function VolunteerDashboard() {
         </div>
 
         {/* QR SCANNER & ATTENDEE VERIFICATION MODAL - ZERO SCROLL OPTIMIZED */}
-        <AnimatePresence>
-          {scannerOpen && (
-            <div
-              style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(3, 7, 18, 0.85)",
-                backdropFilter: "blur(12px)",
-                WebkitBackdropFilter: "blur(12px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 9999,
-                padding: "clamp(6px, 2vw, 16px)",
-                boxSizing: "border-box",
-              }}
-            >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 15 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 15 }}
-                transition={{ duration: 0.2 }}
-                className="glass-card"
-                style={{
-                  width: "100%",
-                  maxWidth: 480,
-                  maxHeight: "94dvh",
-                  background: "var(--bg-elevated)",
-                  borderRadius: 20,
-                  border: "1.5px solid rgba(139, 92, 246, 0.35)",
-                  boxShadow: "0 25px 60px rgba(0,0,0,0.6)",
-                  display: "flex",
-                  flexDirection: "column",
-                  overflow: "hidden",
-                  boxSizing: "border-box",
-                }}
-              >
+        {/* QR SCANNER & ATTENDEE VERIFICATION MODAL - PORTALED DIRECTLY TO BODY FOR TRUE VIEWPORT CENTERING */}
+        {typeof document !== "undefined" &&
+          createPortal(
+            <AnimatePresence>
+              {scannerOpen && (
+                <div
+                  style={{
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    inset: 0,
+                    width: "100vw",
+                    height: "100dvh",
+                    background: "rgba(3, 7, 18, 0.85)",
+                    backdropFilter: "blur(12px)",
+                    WebkitBackdropFilter: "blur(12px)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 999999,
+                    padding: "16px",
+                    boxSizing: "border-box",
+                  }}
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget) {
+                      stopActiveStream();
+                      setScannerOpen(false);
+                    }
+                  }}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                    className="glass-card"
+                    style={{
+                      width: "100%",
+                      maxWidth: 480,
+                      maxHeight: "92dvh",
+                      margin: "auto",
+                      background: "var(--bg-elevated)",
+                      borderRadius: 20,
+                      border: "1.5px solid rgba(139, 92, 246, 0.35)",
+                      boxShadow: "0 25px 60px rgba(0,0,0,0.6)",
+                      display: "flex",
+                      flexDirection: "column",
+                      overflow: "hidden",
+                      boxSizing: "border-box",
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                 {/* Slim Header: zero wasted space */}
                 <div
                   style={{
@@ -1736,7 +1754,9 @@ export default function VolunteerDashboard() {
               </motion.div>
             </div>
           )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
+      )}
       </div>
     </PageTransition>
   );
