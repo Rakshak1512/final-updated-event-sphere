@@ -371,17 +371,32 @@ export default function Login() {
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword((s) => !s)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowPassword((s) => !s);
+                    }}
                     style={{
-                      ...inputIconStyle,
-                      left: "auto",
-                      right: 12,
+                      position: "absolute",
+                      right: 10,
+                      top: "50%",
+                      transform: "translateY(-50%)",
                       background: "none",
                       border: "none",
+                      color: "var(--text-muted)",
                       cursor: "pointer",
+                      pointerEvents: "auto",
+                      zIndex: 10,
+                      width: 36,
+                      height: 36,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: 0,
                     }}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? <FiEyeOff /> : <FiEye />}
+                    {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
                   </button>
                 </div>
                 {errors.password && <span className="form-error">{errors.password}</span>}

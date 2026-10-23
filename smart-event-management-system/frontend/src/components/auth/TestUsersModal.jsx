@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { FiX, FiEye, FiEyeOff, FiLogIn, FiCheck, FiArrowRight } from "react-icons/fi";
 
 const DEMO_ACCOUNTS = [
@@ -61,11 +60,9 @@ export default function TestUsersModal({ isOpen, onClose, onUseAccount, onLoginN
     };
     if (isOpen) {
       document.addEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "hidden";
     }
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "unset";
     };
   }, [isOpen, onClose]);
 
@@ -81,57 +78,49 @@ export default function TestUsersModal({ isOpen, onClose, onUseAccount, onLoginN
       ? DEMO_ACCOUNTS
       : DEMO_ACCOUNTS.filter((acc) => acc.role === activeFilter);
 
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 9999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "20px",
-          }}
-        >
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.22 }}
-            onClick={onClose}
-            style={{
-              position: "absolute",
-              inset: 0,
-              background: "rgba(5, 7, 18, 0.78)",
-              backdropFilter: "blur(14px)",
-              WebkitBackdropFilter: "blur(14px)",
-            }}
-          />
+  if (!isOpen) return null;
 
-          {/* Modal Container */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
-            style={{
-              position: "relative",
-              width: "100%",
-              maxWidth: 620,
-              maxHeight: "90vh",
-              display: "flex",
-              flexDirection: "column",
-              borderRadius: "24px",
-              background: "var(--bg-elevated)",
-              border: "1.5px solid rgba(139, 92, 246, 0.38)",
-              boxShadow: "0 28px 70px rgba(0, 0, 0, 0.55), 0 0 40px rgba(139, 92, 246, 0.22)",
-              overflow: "hidden",
-              zIndex: 10,
-            }}
-          >
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "16px",
+      }}
+    >
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "rgba(5, 7, 18, 0.78)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+        }}
+      />
+
+      {/* Modal Container */}
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          maxWidth: 620,
+          maxHeight: "90vh",
+          display: "flex",
+          flexDirection: "column",
+          borderRadius: "24px",
+          background: "var(--bg-elevated)",
+          border: "1.5px solid rgba(139, 92, 246, 0.38)",
+          boxShadow: "0 28px 70px rgba(0, 0, 0, 0.55), 0 0 40px rgba(139, 92, 246, 0.22)",
+          overflow: "hidden",
+          zIndex: 10,
+        }}
+      >
             {/* Header */}
             <div
               style={{
@@ -399,19 +388,30 @@ export default function TestUsersModal({ isOpen, onClose, onUseAccount, onLoginN
                           <span>{isRevealed ? account.password : "••••••••••••"}</span>
                           <button
                             type="button"
-                            onClick={() => togglePasswordReveal(account.role)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              togglePasswordReveal(account.role);
+                            }}
                             title={isRevealed ? "Hide Password" : "Show Password"}
                             style={{
-                              background: "none",
-                              border: "none",
-                              color: "var(--text-muted)",
+                              background: "rgba(139, 92, 246, 0.12)",
+                              border: "1px solid rgba(139, 92, 246, 0.25)",
+                              color: isRevealed ? "#8b5cf6" : "var(--text-muted)",
                               cursor: "pointer",
                               display: "inline-flex",
                               alignItems: "center",
-                              padding: 2,
+                              justifyContent: "center",
+                              width: 32,
+                              height: 32,
+                              borderRadius: 8,
+                              padding: 0,
+                              pointerEvents: "auto",
+                              zIndex: 10,
                             }}
+                            aria-label={isRevealed ? "Hide password" : "Show password"}
                           >
-                            {isRevealed ? <FiEyeOff size={14} /> : <FiEye size={14} />}
+                            {isRevealed ? <FiEyeOff size={16} /> : <FiEye size={16} />}
                           </button>
                         </div>
                       </div>
@@ -492,9 +492,7 @@ export default function TestUsersModal({ isOpen, onClose, onUseAccount, onLoginN
                 );
               })}
             </div>
-          </motion.div>
+          </div>
         </div>
-      )}
-    </AnimatePresence>
-  );
-}
+      );
+    }
