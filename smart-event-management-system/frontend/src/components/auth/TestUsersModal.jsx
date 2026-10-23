@@ -113,10 +113,10 @@ export default function TestUsersModal({ isOpen, onClose, onUseAccount, onLoginN
 
           {/* Modal Container */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.94, y: 16 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.94, y: 16 }}
-            transition={{ type: "spring", damping: 26, stiffness: 320 }}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
             style={{
               position: "relative",
               width: "100%",
@@ -261,12 +261,8 @@ export default function TestUsersModal({ isOpen, onClose, onUseAccount, onLoginN
               {filteredAccounts.map((account) => {
                 const isRevealed = revealedPasswords[account.role];
                 return (
-                  <motion.div
+                  <div
                     key={account.role}
-                    layout
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
                     style={{
                       borderRadius: "16px",
                       background: "var(--bg-base)",
@@ -276,7 +272,7 @@ export default function TestUsersModal({ isOpen, onClose, onUseAccount, onLoginN
                       flexDirection: "column",
                       gap: 12,
                       position: "relative",
-                      transition: "all 0.22s ease",
+                      transition: "border-color 0.2s ease, box-shadow 0.2s ease",
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.4)";
@@ -482,11 +478,9 @@ export default function TestUsersModal({ isOpen, onClose, onUseAccount, onLoginN
                           transition: "all 0.2s ease",
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = "translateY(-1px)";
                           e.currentTarget.style.boxShadow = "0 6px 18px rgba(139, 92, 246, 0.5)";
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = "none";
                           e.currentTarget.style.boxShadow = "0 4px 14px rgba(139, 92, 246, 0.35)";
                         }}
                       >
@@ -494,7 +488,7 @@ export default function TestUsersModal({ isOpen, onClose, onUseAccount, onLoginN
                         Login Now
                       </button>
                     </div>
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>

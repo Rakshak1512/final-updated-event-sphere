@@ -211,12 +211,7 @@ export default function Home() {
 
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
               {/* 1. GET STARTED: Primary Glowing Gradient CTA */}
-              <motion.div
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                transition={{ duration: 0.2 }}
-                style={{ position: "relative" }}
-              >
+              <div style={{ position: "relative" }}>
                 <Link
                   to="/register"
                   className="btn btn-primary"
@@ -236,42 +231,15 @@ export default function Home() {
                     textDecoration: "none",
                   }}
                 >
-                  {/* Glass shine beam that sweeps across on hover */}
-                  <motion.span
-                    initial={{ x: "-120%", opacity: 0 }}
-                    whileHover={{ x: "200%", opacity: [0, 0.5, 0] }}
-                    transition={{ duration: 0.65, ease: "easeOut" }}
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      width: "60%",
-                      height: "100%",
-                      background: "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent)",
-                      transform: "skewX(-25deg)",
-                      pointerEvents: "none",
-                      zIndex: 1,
-                    }}
-                  />
-
                   <span style={{ position: "relative", zIndex: 2 }}>Get Started</span>
-                  <motion.span
-                    animate={{ x: [0, 4, 0] }}
-                    transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                    style={{ position: "relative", zIndex: 2, display: "inline-flex" }}
-                  >
+                  <span style={{ position: "relative", zIndex: 2, display: "inline-flex" }}>
                     <FiArrowRight size={16} />
-                  </motion.span>
+                  </span>
                 </Link>
-              </motion.div>
+              </div>
 
               {/* 2. LOGIN: Premium Glass Authentication CTA */}
-              <motion.div
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                transition={{ duration: 0.2 }}
-                style={{ position: "relative" }}
-              >
+              <div style={{ position: "relative" }}>
                 <Link
                   to="/login"
                   className="btn btn-outline"
@@ -296,21 +264,14 @@ export default function Home() {
                   }}
                 >
                   <span style={{ position: "relative", zIndex: 2 }}>Login</span>
-                  <motion.span
-                    style={{ position: "relative", zIndex: 2, display: "inline-flex", color: "#8b5cf6" }}
-                  >
+                  <span style={{ position: "relative", zIndex: 2, display: "inline-flex", color: "#8b5cf6" }}>
                     <FiArrowRight size={15} />
-                  </motion.span>
+                  </span>
                 </Link>
-              </motion.div>
+              </div>
 
               {/* 3. EXPLORE EVENTS: Event Discovery Navigation CTA */}
-              <motion.div
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                transition={{ duration: 0.2 }}
-                style={{ position: "relative" }}
-              >
+              <div style={{ position: "relative" }}>
                 <button
                   type="button"
                   onClick={() => handleNavigateSection("events")}
@@ -336,13 +297,11 @@ export default function Home() {
                   }}
                 >
                   <span style={{ position: "relative", zIndex: 2 }}>Explore Events</span>
-                  <motion.span
-                    style={{ position: "relative", zIndex: 2, display: "inline-flex", color: "#0ea5e9" }}
-                  >
+                  <span style={{ position: "relative", zIndex: 2, display: "inline-flex", color: "#0ea5e9" }}>
                     <FiCompass size={16} />
-                  </motion.span>
+                  </span>
                 </button>
-              </motion.div>
+              </div>
             </div>
 
             {/* Quick Metrics */}

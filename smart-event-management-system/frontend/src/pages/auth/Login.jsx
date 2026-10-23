@@ -195,9 +195,9 @@ export default function Login() {
 
         {/* Login Island Card */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 16 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: "easeOut" }}
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
           className="glass-card auth-card float-card"
           style={{
             width: "100%",
@@ -439,12 +439,10 @@ export default function Login() {
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = "#8b5cf6";
                 e.currentTarget.style.background = "rgba(139, 92, 246, 0.1)";
-                e.currentTarget.style.transform = "translateY(-1px)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.3)";
                 e.currentTarget.style.background = "var(--bg-glass)";
-                e.currentTarget.style.transform = "none";
               }}
             >
               <span>🧪</span>

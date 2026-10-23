@@ -518,13 +518,28 @@ img {
 }
 
 .glass-card-interactive {
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .glass-card-interactive:hover {
-  transform: translateY(-2px);
   border-color: rgba(139, 92, 246, 0.4);
   box-shadow: 0 12px 28px rgba(139, 92, 246, 0.12), 0 6px 12px rgba(0, 0, 0, 0.04);
+}
+
+/* Zero unwanted mouse-move / hover shifting on phones and touchscreens */
+@media (hover: none), (pointer: coarse), (max-width: 820px) {
+  .glass-card-interactive,
+  .glass-card-interactive:hover,
+  .btn,
+  .btn:hover,
+  button,
+  button:hover,
+  a,
+  a:hover,
+  .float-card,
+  .float-sidebar {
+    transform: none !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
