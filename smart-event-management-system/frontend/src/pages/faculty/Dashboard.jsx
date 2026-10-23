@@ -12,6 +12,10 @@ import {
   FiAlertCircle,
   FiClock,
   FiXCircle,
+  FiClipboard,
+  FiUploadCloud,
+  FiRefreshCw,
+  FiEdit2,
 } from "react-icons/fi";
 import toast from "react-hot-toast";
 import StatCard from "../../components/dashboard/StatCard.jsx";
@@ -155,7 +159,7 @@ export default function FacultyDashboard() {
           </h1>
           <p style={{ color: "var(--text-secondary)", fontSize: 14.5 }}>{user?.department || "Department Administrator"}</p>
         </div>
-        <div className="btn-group" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <div className="btn-group" style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <Link to="/faculty/student-approvals" className="btn btn-primary btn-sm">
             <FiUsers /> Student Approvals
           </Link>
@@ -165,9 +169,24 @@ export default function FacultyDashboard() {
           <Link to="/faculty/events" className="btn btn-outline btn-sm">
             <FiPlusSquare /> Manage Events
           </Link>
-          <Link to="/faculty/certificates" className="btn btn-outline btn-sm">
-            Issue Certificates
+          <Link to="/faculty/registrations" className="btn btn-outline btn-sm">
+            <FiClipboard /> Registrations
           </Link>
+          <Link to="/faculty/certificates" className="btn btn-outline btn-sm">
+            <FiUploadCloud /> Issue Certificates
+          </Link>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() => {
+              loadData();
+              toast.success("Dashboard refreshed");
+            }}
+            disabled={loading}
+            title="Refresh dashboard data"
+          >
+            <FiRefreshCw className={loading ? "spin" : ""} /> Refresh
+          </button>
         </div>
       </div>
 
@@ -188,30 +207,38 @@ export default function FacultyDashboard() {
           <SkeletonGrid count={4} />
         ) : (
           <div className="grid-cards-4">
-            <StatCard
-              icon={<FiUsers />}
-              label="Total Students"
-              value={studentStats.total_count}
-              accent="#8b5cf6"
-            />
-            <StatCard
-              icon={<FiClock />}
-              label="Pending Students"
-              value={studentStats.pending_count}
-              accent="#f59e0b"
-            />
-            <StatCard
-              icon={<FiCheckCircle />}
-              label="Approved Students"
-              value={studentStats.approved_count}
-              accent="#10b981"
-            />
-            <StatCard
-              icon={<FiXCircle />}
-              label="Rejected Students"
-              value={studentStats.rejected_count}
-              accent="#ef4444"
-            />
+            <Link to="/faculty/student-approvals" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+              <StatCard
+                icon={<FiUsers />}
+                label="Total Students"
+                value={studentStats.total_count}
+                accent="#8b5cf6"
+              />
+            </Link>
+            <Link to="/faculty/student-approvals" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+              <StatCard
+                icon={<FiClock />}
+                label="Pending Students"
+                value={studentStats.pending_count}
+                accent="#f59e0b"
+              />
+            </Link>
+            <Link to="/faculty/student-approvals" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+              <StatCard
+                icon={<FiCheckCircle />}
+                label="Approved Students"
+                value={studentStats.approved_count}
+                accent="#10b981"
+              />
+            </Link>
+            <Link to="/faculty/student-approvals" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+              <StatCard
+                icon={<FiXCircle />}
+                label="Rejected Students"
+                value={studentStats.rejected_count}
+                accent="#ef4444"
+              />
+            </Link>
           </div>
         )}
       </div>
@@ -233,30 +260,38 @@ export default function FacultyDashboard() {
           <SkeletonGrid count={4} />
         ) : (
           <div className="grid-cards-4">
-            <StatCard
-              icon={<FiUsers />}
-              label="Total Volunteers"
-              value={volunteerStats.total_count}
-              accent="#0d9488"
-            />
-            <StatCard
-              icon={<FiClock />}
-              label="Pending Volunteers"
-              value={volunteerStats.pending_count}
-              accent="#f59e0b"
-            />
-            <StatCard
-              icon={<FiCheckCircle />}
-              label="Approved Volunteers"
-              value={volunteerStats.approved_count}
-              accent="#10b981"
-            />
-            <StatCard
-              icon={<FiXCircle />}
-              label="Rejected Volunteers"
-              value={volunteerStats.rejected_count}
-              accent="#ef4444"
-            />
+            <Link to="/faculty/volunteer-approvals" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+              <StatCard
+                icon={<FiUsers />}
+                label="Total Volunteers"
+                value={volunteerStats.total_count}
+                accent="#0d9488"
+              />
+            </Link>
+            <Link to="/faculty/volunteer-approvals" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+              <StatCard
+                icon={<FiClock />}
+                label="Pending Volunteers"
+                value={volunteerStats.pending_count}
+                accent="#f59e0b"
+              />
+            </Link>
+            <Link to="/faculty/volunteer-approvals" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+              <StatCard
+                icon={<FiCheckCircle />}
+                label="Approved Volunteers"
+                value={volunteerStats.approved_count}
+                accent="#10b981"
+              />
+            </Link>
+            <Link to="/faculty/volunteer-approvals" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+              <StatCard
+                icon={<FiXCircle />}
+                label="Rejected Volunteers"
+                value={volunteerStats.rejected_count}
+                accent="#ef4444"
+              />
+            </Link>
           </div>
         )}
       </div>
@@ -265,19 +300,27 @@ export default function FacultyDashboard() {
         <SkeletonGrid count={4} />
       ) : (
         <div className="grid-cards-4" style={{ marginBottom: 28 }}>
-          <StatCard icon={<FiCalendar />} label="Events Created" value={analytics?.total_events_created ?? 0} accent="#6366f1" />
-          <StatCard icon={<FiUsers />} label="Total Registrations" value={analytics?.total_registrations_received ?? 0} accent="#0ea5e9" />
-          <StatCard icon={<FiAward />} label="Certificates Issued" value={analytics?.total_certificates_issued ?? 0} accent="#d946ef" />
-          <StatCard
-            icon={<FiArrowRight />}
-            label="Avg. Registrations / Event"
-            value={
-              analytics?.total_events_created
-                ? Math.round((analytics.total_registrations_received / analytics.total_events_created) * 10) / 10
-                : 0
-            }
-            accent="#22c55e"
-          />
+          <Link to="/faculty/events" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+            <StatCard icon={<FiCalendar />} label="Events Created" value={analytics?.total_events_created ?? 0} accent="#6366f1" />
+          </Link>
+          <Link to="/faculty/registrations" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+            <StatCard icon={<FiUsers />} label="Total Registrations" value={analytics?.total_registrations_received ?? 0} accent="#0ea5e9" />
+          </Link>
+          <Link to="/faculty/certificates" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+            <StatCard icon={<FiAward />} label="Certificates Issued" value={analytics?.total_certificates_issued ?? 0} accent="#d946ef" />
+          </Link>
+          <Link to="/faculty/registrations" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+            <StatCard
+              icon={<FiArrowRight />}
+              label="Avg. Registrations / Event"
+              value={
+                analytics?.total_events_created
+                  ? Math.round((analytics.total_registrations_received / analytics.total_events_created) * 10) / 10
+                  : 0
+              }
+              accent="#22c55e"
+            />
+          </Link>
         </div>
       )}
 
@@ -431,12 +474,13 @@ export default function FacultyDashboard() {
               <th>Event Date</th>
               <th>Venue</th>
               <th>Registrations</th>
+              <th style={{ textAlign: "right" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {recentEvents.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ textAlign: "center", padding: 36, color: "var(--text-secondary)" }}>
+                <td colSpan={6} style={{ textAlign: "center", padding: 36, color: "var(--text-secondary)" }}>
                   No events created yet. Click "Manage Events" above to create your first event.
                 </td>
               </tr>
@@ -453,6 +497,25 @@ export default function FacultyDashboard() {
                     <span style={{ fontWeight: 600, color: ev.available_seats <= 0 ? "var(--danger)" : "var(--success)" }}>
                       {ev.total_seats - ev.available_seats} / {ev.total_seats}
                     </span>
+                  </td>
+                  <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                    <div style={{ display: "inline-flex", gap: 6 }}>
+                      <Link
+                        to="/faculty/registrations"
+                        state={{ eventId: ev.id }}
+                        className="btn btn-outline btn-sm"
+                        style={{ padding: "4px 8px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }}
+                      >
+                        <FiUsers size={12} /> Regs
+                      </Link>
+                      <Link
+                        to="/faculty/events"
+                        className="btn btn-outline btn-sm"
+                        style={{ padding: "4px 8px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }}
+                      >
+                        <FiEdit2 size={12} /> Manage
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))

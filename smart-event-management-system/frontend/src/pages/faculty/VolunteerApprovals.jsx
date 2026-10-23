@@ -236,12 +236,22 @@ export default function VolunteerApprovals() {
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
+            whileHover={{ y: -2 }}
+            onClick={() => setStatusFilter("PENDING")}
             className="glass-card"
             style={{
               padding: "18px 20px",
               borderRadius: 16,
-              border: "1px solid rgba(245, 158, 11, 0.3)",
-              background: "linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(245, 158, 11, 0.02))",
+              cursor: "pointer",
+              border:
+                statusFilter === "PENDING"
+                  ? "2px solid #f59e0b"
+                  : "1px solid rgba(245, 158, 11, 0.3)",
+              background:
+                statusFilter === "PENDING"
+                  ? "linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(245, 158, 11, 0.06))"
+                  : "linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(245, 158, 11, 0.02))",
+              boxShadow: data.pending_count > 0 ? "0 4px 20px rgba(245, 158, 11, 0.15)" : "none",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -276,12 +286,21 @@ export default function VolunteerApprovals() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
+            whileHover={{ y: -2 }}
+            onClick={() => setStatusFilter("APPROVED")}
             className="glass-card"
             style={{
               padding: "18px 20px",
               borderRadius: 16,
-              border: "1px solid rgba(16, 185, 129, 0.3)",
-              background: "linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.02))",
+              cursor: "pointer",
+              border:
+                statusFilter === "APPROVED"
+                  ? "2px solid #10b981"
+                  : "1px solid rgba(16, 185, 129, 0.3)",
+              background:
+                statusFilter === "APPROVED"
+                  ? "linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(16, 185, 129, 0.06))"
+                  : "linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.02))",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -316,12 +335,21 @@ export default function VolunteerApprovals() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
+            whileHover={{ y: -2 }}
+            onClick={() => setStatusFilter("REJECTED")}
             className="glass-card"
             style={{
               padding: "18px 20px",
               borderRadius: 16,
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              background: "linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(239, 68, 68, 0.02))",
+              cursor: "pointer",
+              border:
+                statusFilter === "REJECTED"
+                  ? "2px solid #ef4444"
+                  : "1px solid rgba(239, 68, 68, 0.3)",
+              background:
+                statusFilter === "REJECTED"
+                  ? "linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(239, 68, 68, 0.06))"
+                  : "linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(239, 68, 68, 0.02))",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -356,12 +384,21 @@ export default function VolunteerApprovals() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
+            whileHover={{ y: -2 }}
+            onClick={() => setStatusFilter("ALL")}
             className="glass-card"
             style={{
               padding: "18px 20px",
               borderRadius: 16,
-              border: "1px solid rgba(13, 148, 136, 0.3)",
-              background: "linear-gradient(135deg, rgba(13, 148, 136, 0.08), rgba(13, 148, 136, 0.02))",
+              cursor: "pointer",
+              border:
+                statusFilter === "ALL"
+                  ? "2px solid #0d9488"
+                  : "1px solid rgba(13, 148, 136, 0.3)",
+              background:
+                statusFilter === "ALL"
+                  ? "linear-gradient(135deg, rgba(13, 148, 136, 0.18), rgba(13, 148, 136, 0.06))"
+                  : "linear-gradient(135deg, rgba(13, 148, 136, 0.08), rgba(13, 148, 136, 0.02))",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
