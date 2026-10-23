@@ -1,4 +1,5 @@
 import api, { API_BASE_URL } from "./axios.js";
+import { downloadBlobOrFile } from "../utils/fileDownload.js";
 
 /* ---------------- Auth ---------------- */
 export const authService = {
@@ -75,18 +76,8 @@ export const registrationService = {
       throw new Error(parsed.detail || "Failed to download registration slip");
     }
 
-    const blob = new Blob([response.data], {
-      type: "application/pdf",
-    });
-
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `registration-slip-${id}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    const filename = `registration-slip-${id}.pdf`;
+    return await downloadBlobOrFile(response.data, filename, "application/pdf");
   },
 
   forEvent: (eventId, params = {}) =>
@@ -136,15 +127,9 @@ export const certificateService = {
     }
     const isImage = headerType.startsWith("image/") || (response.data.type && response.data.type.startsWith("image/"));
     const ext = isImage ? (headerType.includes("png") ? "png" : "jpg") : "pdf";
-    const finalBlob = new Blob([response.data], { type: isImage ? (headerType || "image/jpeg") : "application/pdf" });
-    const url = window.URL.createObjectURL(finalBlob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}.${ext}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    const mimeType = isImage ? (headerType || "image/jpeg") : "application/pdf";
+    const filename = `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}.${ext}`;
+    return await downloadBlobOrFile(response.data, filename, mimeType);
   },
 
   facultyUploaded: () => api.get("/certificates/faculty/uploaded"),
@@ -252,16 +237,8 @@ export const adminService = {
       all: "All Faculty.pdf",
     };
     const filename = filenameMap[cleanType] || "Faculty Report.pdf";
-    const blob = new Blob([response.data], { type: "application/pdf" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-    return true;
+    await downloadBlobOrFile(response.data, filename, "application/pdf");
+    return { success: true, data: response.data };
   },
 };
 
@@ -284,16 +261,8 @@ export const facultyApprovalService = {
       all: "All Students.pdf",
     };
     const filename = filenameMap[cleanType] || "Student Report.pdf";
-    const blob = new Blob([response.data], { type: "application/pdf" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-    return true;
+    await downloadBlobOrFile(response.data, filename, "application/pdf");
+    return { success: true, data: response.data };
   },
 };
 
@@ -316,16 +285,8 @@ export const volunteerApprovalService = {
       all: "All Volunteers.pdf",
     };
     const filename = filenameMap[cleanType] || "Volunteer Report.pdf";
-    const blob = new Blob([response.data], { type: "application/pdf" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-    return true;
+    await downloadBlobOrFile(response.data, filename, "application/pdf");
+    return { success: true, data: response.data };
   },
 };
 

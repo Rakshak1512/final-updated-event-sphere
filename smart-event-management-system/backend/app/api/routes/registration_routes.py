@@ -272,10 +272,21 @@ def download_slip(
         qr_code_path=registration.qr_code_path,
     )
 
+    slip_filename = f"slip-{registration.ticket_code}.pdf"
+    from urllib.parse import quote
+    encoded_filename = quote(slip_filename)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="slip-{registration.ticket_code}.pdf"'},
+        headers={
+            "Content-Type": "application/pdf",
+            "Content-Disposition": f'attachment; filename="{slip_filename}"; filename*=UTF-8\'\'{encoded_filename}',
+            "Access-Control-Expose-Headers": "Content-Disposition, Content-Type, Content-Length",
+            "Cache-Control": "private, no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 

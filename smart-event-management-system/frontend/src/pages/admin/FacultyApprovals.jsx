@@ -137,16 +137,7 @@ export default function FacultyApprovals() {
     try {
       setDownloadingPdf(type);
       toast.loading(`Generating ${titleCase} Faculty PDF report...`, { id: "pdf-toast" });
-      const res = await adminService.downloadFacultyPdf(type);
-      const blob = new Blob([res.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `${titleCase} Faculty.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      await adminService.downloadFacultyPdf(type);
       toast.success(`${titleCase} Faculty PDF downloaded successfully!`, { id: "pdf-toast" });
     } catch (err) {
       console.error("PDF report download failed:", err);

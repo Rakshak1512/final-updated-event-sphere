@@ -2,6 +2,7 @@
  * CSV Export Utilities for EventSphere
  * Converts real current data structures to clean, formatted CSV downloads.
  */
+import { downloadBlobOrFile } from "./fileDownload.js";
 
 function sanitizeField(val) {
   if (val === null || val === undefined) return '""';
@@ -31,14 +32,10 @@ export function exportToCSV(filename, headers, rows) {
 
 function downloadBlob(filename, content) {
   const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.setAttribute("download", filename.endsWith(".csv") ? filename : `${filename}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  const targetFilename = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+  downloadBlobOrFile(blob, targetFilename, "text/csv;charset=utf-8;").catch((err) => {
+    console.error("CSV download error:", err);
+  });
 }
 
 export function slugifyFilename(title, suffix) {

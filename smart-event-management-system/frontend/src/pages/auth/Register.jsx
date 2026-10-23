@@ -110,8 +110,14 @@ export default function Register() {
       };
 
       await register(payload);
-      toast.success("Verification OTP sent to your email!");
-      navigate("/verify-email", { state: { email: form.email.trim().toLowerCase(), role: form.role, name: form.name.trim() } });
+      toast.success("Verification code sent to your email!");
+      navigate("/verify-email", {
+        state: {
+          email: form.email.trim().toLowerCase(),
+          role: form.role,
+          name: form.name.trim(),
+        },
+      });
     } catch (err) {
       const detail = err.response?.data?.detail;
       let msg = "Registration failed. Please check your details.";

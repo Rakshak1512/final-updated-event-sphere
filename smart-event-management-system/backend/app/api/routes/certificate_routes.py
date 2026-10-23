@@ -328,6 +328,7 @@ def my_certificates(
 @router.get("/{certificate_id}/download")
 def download_certificate(
     certificate_id: int,
+    inline: bool = False,
     current_user: User = Depends(require_role(RoleEnum.student, RoleEnum.faculty, RoleEnum.admin)),
 ):
     certificate = db_service.get_certificate_by_id(certificate_id)
@@ -399,11 +400,20 @@ def download_certificate(
     elif ext == ".webp":
         media_type = "image/webp"
 
+    from urllib.parse import quote
     safe_title = "".join(c for c in certificate.title if c.isalnum() or c in (" ", "-", "_")).strip() or "certificate"
+    file_name = f"{safe_title}{ext or '.pdf'}"
+    encoded_filename = quote(file_name)
+    disp = "inline" if inline else "attachment"
+
     headers = {
-        "Content-Disposition": f'inline; filename="{safe_title}{ext or ".pdf"}"',
+        "Content-Type": media_type,
+        "Content-Disposition": f'{disp}; filename="{file_name}"; filename*=UTF-8\'\'{encoded_filename}',
         "Access-Control-Expose-Headers": "Content-Disposition, Content-Type, Content-Length",
-        "Cache-Control": "private, max-age=3600",
+        "Cache-Control": "private, no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+        "X-Content-Type-Options": "nosniff",
     }
 
     return Response(

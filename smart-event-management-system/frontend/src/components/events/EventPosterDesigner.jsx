@@ -18,6 +18,7 @@ import {
 } from "react-icons/fi";
 import { HiSparkles } from "react-icons/hi";
 import { jsPDF } from "jspdf";
+import { downloadBlobOrFile } from "../../utils/fileDownload.js";
 
 const TEMPLATES = [
   {
@@ -581,7 +582,7 @@ export default function EventPosterDesigner({
   };
 
   // Download high-resolution PDF
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -603,7 +604,9 @@ export default function EventPosterDesigner({
         .toLowerCase()
         .replace(/[^a-z0-9]/g, "_")
         .slice(0, 32);
-      doc.save(`${safeTitle}_poster.pdf`);
+      const filename = `${safeTitle}_poster.pdf`;
+      const pdfBlob = doc.output("blob");
+      await downloadBlobOrFile(pdfBlob, filename, "application/pdf");
       toast.success("Poster PDF downloaded successfully!");
     } catch (err) {
       console.error("PDF download failed:", err);

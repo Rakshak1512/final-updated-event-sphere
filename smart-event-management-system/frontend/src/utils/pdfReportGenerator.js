@@ -2,6 +2,24 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatDate } from "./format.js";
 import { slugifyFilename } from "./exportUtils.js";
+import { downloadBlobOrFile } from "./fileDownload.js";
+
+// Helper to reliably trigger cross-device download or mobile native save
+const saveDoc = async (doc, filename) => {
+  try {
+    const blob = doc.output("blob");
+    await downloadBlobOrFile(blob, filename, "application/pdf");
+  } catch (err) {
+    console.warn("Universal PDF download/share fallback to doc.save:", err);
+    try {
+      doc.save(filename);
+    } catch (saveErr) {
+      console.error("doc.save also failed:", saveErr);
+      throw saveErr;
+    }
+  }
+  return doc;
+};
 
 // Helper to format safe filenames
 const getPdfFilename = (eventTitle, reportType) => {
@@ -212,7 +230,8 @@ export const generateRegistrationReportPDF = ({ event, registrations }) => {
   });
 
   addPageNumbers(doc);
-  doc.save(getPdfFilename(event?.title, "Registration_Report"));
+  const safeName = getPdfFilename(event?.title, "Registration_Report");
+  return saveDoc(doc, safeName);
 };
 
 /**
@@ -307,7 +326,8 @@ export const generateAttendanceReportPDF = ({ event, registrations }) => {
   });
 
   addPageNumbers(doc);
-  doc.save(getPdfFilename(event?.title, "Attendance_Report"));
+  const safeName = getPdfFilename(event?.title, "Attendance_Report");
+  return saveDoc(doc, safeName);
 };
 
 /**
@@ -377,7 +397,8 @@ export const generateResultsReportPDF = ({ event, results }) => {
   });
 
   addPageNumbers(doc);
-  doc.save(getPdfFilename(event?.title, "Results"));
+  const safeName = getPdfFilename(event?.title, "Results");
+  return saveDoc(doc, safeName);
 };
 
 /**
@@ -441,7 +462,8 @@ export const generateWinnersReportPDF = ({ event, results }) => {
   });
 
   addPageNumbers(doc);
-  doc.save(getPdfFilename(event?.title, "Winners"));
+  const safeName = getPdfFilename(event?.title, "Winners");
+  return saveDoc(doc, safeName);
 };
 
 /**
@@ -607,8 +629,7 @@ export const generateCustomReportPDF = ({
   const safeName =
     filename ||
     `EventSphere_${(title || "Report").replace(/[^a-zA-Z0-9_-]/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`;
-  doc.save(safeName);
-  return doc;
+  return saveDoc(doc, safeName);
 };
 
 /**

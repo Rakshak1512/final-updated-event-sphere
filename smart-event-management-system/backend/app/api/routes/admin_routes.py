@@ -365,12 +365,19 @@ def _generate_faculty_pdf_response(status_type: str) -> Response:
         label = "All Faculty"
 
     pdf_bytes = generate_faculty_approval_pdf(filtered, label)
+    from urllib.parse import quote
+    encoded_filename = quote(filename)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
             "Content-Type": "application/pdf",
+            "Content-Disposition": f'attachment; filename="{filename}"; filename*=UTF-8\'\'{encoded_filename}',
+            "Access-Control-Expose-Headers": "Content-Disposition, Content-Type, Content-Length",
+            "Cache-Control": "private, no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "X-Content-Type-Options": "nosniff",
         },
     )
 
@@ -532,12 +539,19 @@ def _generate_student_pdf_response(status_type: str) -> Response:
         label = "All Students"
 
     pdf_bytes = generate_student_approval_pdf(filtered, label)
+    from urllib.parse import quote
+    encoded_filename = quote(filename)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
             "Content-Type": "application/pdf",
+            "Content-Disposition": f'attachment; filename="{filename}"; filename*=UTF-8\'\'{encoded_filename}',
+            "Access-Control-Expose-Headers": "Content-Disposition, Content-Type, Content-Length",
+            "Cache-Control": "private, no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "X-Content-Type-Options": "nosniff",
         },
     )
 
@@ -776,12 +790,19 @@ def _generate_volunteer_pdf_response(status_type: str) -> Response:
         label = "All Volunteers"
 
     pdf_bytes = generate_volunteer_approval_pdf(filtered, label)
+    from urllib.parse import quote
+    encoded_filename = quote(filename)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
             "Content-Type": "application/pdf",
+            "Content-Disposition": f'attachment; filename="{filename}"; filename*=UTF-8\'\'{encoded_filename}',
+            "Access-Control-Expose-Headers": "Content-Disposition, Content-Type, Content-Length",
+            "Cache-Control": "private, no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "X-Content-Type-Options": "nosniff",
         },
     )
 
