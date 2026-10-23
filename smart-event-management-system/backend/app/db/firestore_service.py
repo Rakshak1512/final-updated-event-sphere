@@ -2922,6 +2922,29 @@ def verify_ticket_for_volunteer(
         return False, "Invalid registration QR code.", None
 
     target_ticket_code = raw_str
+
+    # Extract if scanned payload is JSON
+    if raw_str.startswith("{") and raw_str.endswith("}"):
+        try:
+            import json
+            parsed = json.loads(raw_str)
+            if isinstance(parsed, dict):
+                if parsed.get("ticket_code"):
+                    target_ticket_code = str(parsed["ticket_code"]).strip()
+                elif parsed.get("ticket"):
+                    target_ticket_code = str(parsed["ticket"]).strip()
+                elif parsed.get("registration_id"):
+                    target_ticket_code = f"REG-{parsed['registration_id']}"
+                elif parsed.get("id"):
+                    target_ticket_code = f"REG-{parsed['id']}"
+                if parsed.get("event_id") and not event_id:
+                    try:
+                        event_id = int(parsed["event_id"])
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
     # Extract ticket code if scanned string is a URL (e.g. /ticket/{code} or /registrations/{id}/qr)
     if "/ticket/" in raw_str:
         try:

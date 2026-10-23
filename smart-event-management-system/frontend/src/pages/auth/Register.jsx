@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
-import { FiCalendar, FiUpload } from "react-icons/fi";
+import { FiCalendar, FiUpload, FiEye, FiEyeOff } from "react-icons/fi";
 import ThemeToggle from "../../components/common/ThemeToggle.jsx";
 import PageTransition from "../../components/common/PageTransition.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -30,6 +30,8 @@ export default function Register() {
   const [picturePreview, setPicturePreview] = useState(null);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [adminAvailability, setAdminAvailability] = useState(null);
   const [checkingAdmin, setCheckingAdmin] = useState(false);
 
@@ -434,26 +436,74 @@ export default function Register() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <div className="form-group">
                 <label className="form-label">Password</label>
-                <input
-                  className="form-input"
-                  type="password"
-                  value={form.password}
-                  onChange={update("password")}
-                  placeholder="••••••••"
-                  required
-                />
+                <div style={{ position: "relative" }}>
+                  <input
+                    className="form-input"
+                    type={showPassword ? "text" : "password"}
+                    value={form.password}
+                    onChange={update("password")}
+                    placeholder="••••••••"
+                    style={{ paddingRight: 38 }}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((s) => !s)}
+                    style={{
+                      position: "absolute",
+                      right: 12,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      color: "var(--text-muted)",
+                      cursor: "pointer",
+                      padding: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      fontSize: 16,
+                    }}
+                    title={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <FiEyeOff /> : <FiEye />}
+                  </button>
+                </div>
                 {errors.password && <span className="form-error">{errors.password}</span>}
               </div>
               <div className="form-group">
                 <label className="form-label">Confirm Password</label>
-                <input
-                  className="form-input"
-                  type="password"
-                  value={form.confirm_password}
-                  onChange={update("confirm_password")}
-                  placeholder="••••••••"
-                  required
-                />
+                <div style={{ position: "relative" }}>
+                  <input
+                    className="form-input"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={form.confirm_password}
+                    onChange={update("confirm_password")}
+                    placeholder="••••••••"
+                    style={{ paddingRight: 38 }}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((s) => !s)}
+                    style={{
+                      position: "absolute",
+                      right: 12,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      color: "var(--text-muted)",
+                      cursor: "pointer",
+                      padding: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      fontSize: 16,
+                    }}
+                    title={showConfirmPassword ? "Hide password" : "Show password"}
+                  >
+                    {showConfirmPassword ? <FiEyeOff /> : <FiEye />}
+                  </button>
+                </div>
                 {errors.confirm_password && <span className="form-error">{errors.confirm_password}</span>}
               </div>
             </div>

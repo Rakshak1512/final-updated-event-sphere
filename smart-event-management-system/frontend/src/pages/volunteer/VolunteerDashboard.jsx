@@ -22,12 +22,168 @@ import {
   FiRepeat,
   FiDownload,
   FiFileText,
+  FiPlay,
+  FiPause,
+  FiZap,
+  FiArrowLeft,
 } from "react-icons/fi";
 import PageTransition from "../../components/common/PageTransition.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { volunteerService } from "../../api/services.js";
 import { generateVolunteerScansPDF } from "../../utils/pdfReportGenerator.js";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
+
+/**
+ * Universal safe parser for EventSphere QR payloads:
+ * - JSON format: {"ticket_code": "...", "event_id": ...}
+ * - Standard EventSphere format: TICKET:{ticket_code}|EVENT:{event_id}|STUDENT:{student_id}
+ * - Team format: TICKET:{ticket_code}|EVENT:{event_id}|STUDENT:{student_id}|TEAM:{team_id}
+ * - Direct Ticket URLs: https://.../ticket/{ticket_code} or query params ?ticket=...
+ * - Direct QR URLs: https://.../registrations/{id}/qr or /ticket/{ticket_code}/qr
+ * - Plain codes / hashes: #BA6436533EF14244 or BA6436533EF14244
+ * - Registration ID: REG-12 or 12
+ */
+export function parseTicketPayload(rawInput, fallbackEventId = null) {
+  let raw = String(rawInput || "").trim();
+  if (!raw) return { ticketCode: "", eventId: fallbackEventId };
+
+  let extractedCode = raw;
+  let extractedEventId = fallbackEventId;
+
+  // 1. JSON parsing support
+  if ((raw.startsWith("{") && raw.endsWith("}")) || (raw.startsWith("[") && raw.endsWith("]"))) {
+    try {
+      const parsed = JSON.parse(raw);
+      const obj = Array.isArray(parsed) ? parsed[0] : parsed;
+      if (obj) {
+        if (obj.ticket_code) extractedCode = String(obj.ticket_code).trim();
+        else if (obj.ticket) extractedCode = String(obj.ticket).trim();
+        else if (obj.code) extractedCode = String(obj.code).trim();
+        else if (obj.registration_id) extractedCode = `REG-${obj.registration_id}`;
+        else if (obj.id) extractedCode = `REG-${obj.id}`;
+
+        if (obj.event_id && !extractedEventId) {
+          const ev = parseInt(obj.event_id, 10);
+          if (!isNaN(ev)) extractedEventId = ev;
+        }
+        return {
+          ticketCode: extractedCode.replace(/^#+/, "").trim().toUpperCase(),
+          eventId: extractedEventId,
+        };
+      }
+    } catch (e) {}
+  }
+
+  // 2. URL parsing support (handles query parameters ?ticket=... or /ticket/... paths)
+  if (raw.startsWith("http://") || raw.startsWith("https://") || raw.includes("://") || raw.startsWith("/")) {
+    try {
+      const parsedUrl = new URL(raw, "https://eventsphere.local");
+      const ticketParam =
+        parsedUrl.searchParams.get("ticket") ||
+        parsedUrl.searchParams.get("ticket_code") ||
+        parsedUrl.searchParams.get("code") ||
+        parsedUrl.searchParams.get("t");
+      const eventParam =
+        parsedUrl.searchParams.get("event") ||
+        parsedUrl.searchParams.get("event_id") ||
+        parsedUrl.searchParams.get("e");
+
+      if (ticketParam) extractedCode = ticketParam;
+      if (eventParam && !extractedEventId) {
+        const ev = parseInt(eventParam, 10);
+        if (!isNaN(ev)) extractedEventId = ev;
+      }
+
+      if (parsedUrl.pathname.includes("/ticket/")) {
+        const match = parsedUrl.pathname.match(/\/ticket\/([^/?#]+)/);
+        if (match && match[1]) extractedCode = match[1];
+      } else if (parsedUrl.pathname.includes("/registrations/") && parsedUrl.pathname.includes("/qr")) {
+        const match = parsedUrl.pathname.match(/\/registrations\/(\d+)\/qr/);
+        if (match && match[1]) extractedCode = `REG-${match[1]}`;
+      }
+    } catch (e) {}
+  }
+
+  // 3. Pipe-delimited EventSphere payload (TICKET:...|EVENT:...|STUDENT:...)
+  if (extractedCode.includes("TICKET:") || extractedCode.includes("|")) {
+    const parts = extractedCode.split("|");
+    for (const part of parts) {
+      const p = part.trim();
+      if (p.startsWith("TICKET:")) {
+        extractedCode = p.replace("TICKET:", "").trim();
+      } else if (p.startsWith("EVENT:") && !extractedEventId) {
+        const ev = parseInt(p.replace("EVENT:", "").trim(), 10);
+        if (!isNaN(ev)) extractedEventId = ev;
+      }
+    }
+  }
+
+  // 4. Normalize
+  extractedCode = extractedCode.replace(/^#+/, "").trim().toUpperCase();
+
+  return {
+    ticketCode: extractedCode,
+    eventId: extractedEventId,
+  };
+}
+
+/**
+ * Client-side canvas image preprocessing for fallback image decoding.
+ * Normalizes contrast and applies adaptive grayscale binarization.
+ * Dramatically boosts detection for glare, low-contrast, or dark-mode screenshots.
+ */
+function preprocessImageForQR(file) {
+  return new Promise((resolve) => {
+    if (!file || typeof window === "undefined") {
+      resolve(null);
+      return;
+    }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      try {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const maxDim = 1200;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const imgData = ctx.getImageData(0, 0, width, height);
+        const d = imgData.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+          const val = gray < 120 ? Math.max(0, gray * 0.6) : Math.min(255, gray * 1.3);
+          d[i] = val;
+          d[i + 1] = val;
+          d[i + 2] = val;
+        }
+        ctx.putImageData(imgData, 0, 0);
+        canvas.toBlob((blob) => {
+          resolve(blob ? new File([blob], "preprocessed_qr.png", { type: "image/png" }) : null);
+        }, "image/png");
+      } catch (e) {
+        resolve(null);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(null);
+    };
+    img.src = url;
+  });
+}
 
 export default function VolunteerDashboard() {
   const { user } = useAuth();
@@ -54,6 +210,7 @@ export default function VolunteerDashboard() {
   const [verifyError, setVerifyError] = useState(null);
   const [confirming, setConfirming] = useState(false);
   const [confirmedSuccess, setConfirmedSuccess] = useState(null);
+  const [scannerPaused, setScannerPaused] = useState(false);
 
   // Camera & Mode state: Strictly two logical cameras: "back" (default) and "front"
   const [scannerMode, setScannerMode] = useState("camera"); // "camera" | "upload"
@@ -64,7 +221,14 @@ export default function VolunteerDashboard() {
   const [cameraError, setCameraError] = useState(null);
   const [switchingCamera, setSwitchingCamera] = useState(false);
 
-  // References to resolved back & front device IDs (filtered to remove wide/tele/ultra/depth cameras)
+  // Advanced Hardware Capabilities (Torch / Flashlight, Zoom, Focus)
+  const [hasTorch, setHasTorch] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [hasZoom, setHasZoom] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const cameraTrackRef = useRef(null);
+
+  // References to resolved back & front device IDs (filtered to remove auxiliary ultra-wide/tele/macro cameras)
   const backCameraIdRef = useRef(null);
   const frontCameraIdRef = useRef(null);
 
@@ -100,9 +264,9 @@ export default function VolunteerDashboard() {
   // Completely stop any running camera stream to guarantee only one stream is active at a time
   // and release all camera hardware tracks cleanly
   const stopActiveStream = async () => {
+    setTorchOn(false);
     if (html5QrCodeInstance.current) {
       const instance = html5QrCodeInstance.current;
-      html5QrCodeInstance.current = null;
       try {
         if (instance.isScanning) {
           await instance.stop();
@@ -113,6 +277,7 @@ export default function VolunteerDashboard() {
       try {
         instance.clear();
       } catch (e) {}
+      html5QrCodeInstance.current = null;
     }
     // Also explicitly find any active video elements or media streams and stop all tracks
     try {
@@ -128,6 +293,7 @@ export default function VolunteerDashboard() {
         }
       });
     } catch (e) {}
+    cameraTrackRef.current = null;
   };
 
   // Prevent background scrolling when scanner modal is active
@@ -142,7 +308,7 @@ export default function VolunteerDashboard() {
   }, [scannerOpen]);
 
   // Enumerate cameras and filter exclusively for the primary standard Front and Back cameras
-  // Robust against laptops (webcam), iPhones, iPads, and Android devices
+  // Preserves "wide" because Apple iPhone and Google Pixel main 1x rear cameras are labeled "Wide-Angle Camera"
   const resolveLogicalCameras = async () => {
     try {
       const devices = await Html5Qrcode.getCameras();
@@ -161,45 +327,51 @@ export default function VolunteerDashboard() {
         };
       }
 
-      const isSpecialLens = (label) => {
+      // Filter auxiliary lenses (ultra-wide 0.5x, telephoto, macro, virtual)
+      const isAuxiliaryLens = (label) => {
         const l = (label || "").toLowerCase();
         return (
-          l.includes("wide") ||
           l.includes("ultra") ||
           l.includes("tele") ||
           l.includes("zoom") ||
           l.includes("macro") ||
           l.includes("depth") ||
-          l.includes("virtual")
+          l.includes("virtual") ||
+          l.includes("fisheye")
         );
       };
 
       // 1. Resolve standard Back camera (excluding auxiliary lenses)
       const standardBack = devices.filter((d) => {
         const l = (d.label || "").toLowerCase();
-        return (l.includes("back") || l.includes("rear") || l.includes("environment")) && !isSpecialLens(l);
+        return (l.includes("back") || l.includes("rear") || l.includes("environment")) && !isAuxiliaryLens(l);
       });
-      const anyBack = standardBack.length > 0
-        ? standardBack[0]
-        : devices.find((d) => {
-            const l = (d.label || "").toLowerCase();
-            return l.includes("back") || l.includes("rear") || l.includes("environment");
-          });
+      const anyBack =
+        standardBack.length > 0
+          ? standardBack[0]
+          : devices.find((d) => {
+              const l = (d.label || "").toLowerCase();
+              return l.includes("back") || l.includes("rear") || l.includes("environment");
+            });
 
       // 2. Resolve standard Front camera
       const standardFront = devices.filter((d) => {
         const l = (d.label || "").toLowerCase();
-        return (l.includes("front") || l.includes("user") || l.includes("selfie") || l.includes("facetime")) && !isSpecialLens(l);
+        return (
+          (l.includes("front") || l.includes("user") || l.includes("selfie") || l.includes("facetime")) &&
+          !isAuxiliaryLens(l)
+        );
       });
-      const anyFront = standardFront.length > 0
-        ? standardFront[0]
-        : devices.find((d) => {
-            const l = (d.label || "").toLowerCase();
-            return l.includes("front") || l.includes("user") || l.includes("selfie") || l.includes("facetime");
-          });
+      const anyFront =
+        standardFront.length > 0
+          ? standardFront[0]
+          : devices.find((d) => {
+              const l = (d.label || "").toLowerCase();
+              return l.includes("front") || l.includes("user") || l.includes("selfie") || l.includes("facetime");
+            });
 
       const resolvedBack = anyBack ? anyBack.id : devices[0]?.id;
-      const resolvedFront = anyFront ? anyFront.id : (devices[devices.length - 1]?.id || devices[0]?.id);
+      const resolvedFront = anyFront ? anyFront.id : devices[devices.length - 1]?.id || devices[0]?.id;
 
       return {
         backId: resolvedBack,
@@ -215,97 +387,144 @@ export default function VolunteerDashboard() {
   };
 
   // Helper to start the live camera stream with bulletproof multi-ladder fallback for all platforms:
-  // Laptop webcam, Android phone/tablet, iPhone, iPad Safari, external USB cameras
+  // Mobile phones (rear camera with continuous focus), iPhones/iPads, Android Chrome, and laptop webcams
   const startCameraStream = async (scanner, targetChoice) => {
     let choice = targetChoice || cameraChoice || "back";
     setCameraLoading(true);
     setCameraError(null);
+    setHasTorch(false);
+    setTorchOn(false);
+    setHasZoom(false);
+    setZoomLevel(1);
 
-    // Secure context check (camera requires HTTPS or localhost)
-    if (!window.isSecureContext && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+    // Browser support check
+    if (typeof navigator === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setCameraError(
-        "Camera access requires a secure connection (HTTPS or localhost). Please use 'Upload QR Image' or manual code entry."
+        "Camera access is not supported by this browser. Please use 'Upload QR' or manual code entry."
       );
       setCameraLoading(false);
       return;
     }
 
-    // Stop current stream before starting another
-    await stopActiveStream();
-
-    const qrConfig = {
-      fps: 25,
-      qrbox: (viewfinderWidth, viewfinderHeight) => {
-        const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-        if (minEdge <= 60) {
-          return { width: minEdge, height: minEdge };
-        }
-        // Generous box (80% of min dimension) for effortless instant scanning from any distance or angle
-        const boxDim = Math.max(Math.floor(minEdge * 0.80), 50);
-        const safeDim = Math.min(boxDim, Math.max(minEdge - 10, 40));
-        return {
-          width: safeDim,
-          height: safeDim,
-        };
-      },
-      disableFlip: choice === "back",
-    };
+    // Secure context check (camera requires HTTPS or localhost)
+    if (!window.isSecureContext && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+      setCameraError(
+        "Camera access requires a secure connection (HTTPS or localhost). Please switch to 'Upload QR' or enter code manually."
+      );
+      setCameraLoading(false);
+      return;
+    }
 
     const onScanSuccess = (decodedText) => {
       if (isScanningRef.current) return;
       isScanningRef.current = true;
-      handleVerifyTicket(decodedText);
       try {
-        scanner.stop();
+        if (scanner && scanner.isScanning) {
+          scanner.pause(true);
+        }
       } catch (e) {}
+      handleVerifyTicket(decodedText);
     };
 
-    // Ordered ladder of camera launch configurations:
-    // 1. Resolved specific hardware ID if known
-    // 2. Requested facingMode ({ facingMode: "environment" } or { facingMode: "user" })
-    // 3. Alternate facingMode (crucial for laptops where "environment" causes OverconstrainedError)
-    // 4. Any enumerated device ID
-    // 5. Permissive fallback / basic video stream
+    // Camera execution ladder:
+    // 1. Mobile-optimal ideal facingMode with crisp resolution (1280x720 ideal)
+    // 2. Resolved specific hardware device ID if known
+    // 3. String facingMode
+    // 4. Alternate facingMode (allows laptops to instantly activate user webcam if rear requested)
+    // 5. Enumerated camera IDs
+    // 6. Basic fallback
     const attempts = [];
 
+    // Attempt 1: Ideal facingMode with 1280x720 videoConstraints (Preferred on phones!)
+    attempts.push({
+      cameraConfig: { facingMode: choice === "front" ? "user" : "environment" },
+      scanConfig: {
+        fps: 15,
+        disableFlip: choice === "back",
+        videoConstraints: {
+          facingMode: { ideal: choice === "front" ? "user" : "environment" },
+          width: { min: 640, ideal: 1280, max: 1920 },
+          height: { min: 480, ideal: 720, max: 1080 },
+        },
+      },
+    });
+
+    // Attempt 2: Resolved specific hardware camera device ID
     const specificId = choice === "front" ? frontCameraIdRef.current : backCameraIdRef.current;
     if (specificId) {
-      attempts.push({ deviceId: { exact: specificId } });
+      attempts.push({
+        cameraConfig: specificId,
+        scanConfig: {
+          fps: 15,
+          disableFlip: choice === "back",
+          videoConstraints: {
+            deviceId: { exact: specificId },
+            width: { min: 640, ideal: 1280, max: 1920 },
+            height: { min: 480, ideal: 720, max: 1080 },
+          },
+        },
+      });
     }
 
-    // Requested facing mode
-    attempts.push({ facingMode: choice === "front" ? "user" : "environment" });
+    // Attempt 3: Standard facingMode without resolution constraints
+    attempts.push({
+      cameraConfig: { facingMode: choice === "front" ? "user" : "environment" },
+      scanConfig: {
+        fps: 15,
+        disableFlip: choice === "back",
+      },
+    });
 
-    // Alternate facing mode (allows laptops to instantly activate user webcam when environment fails)
-    attempts.push({ facingMode: choice === "front" ? "environment" : "user" });
+    // Attempt 4: Alternate facingMode (lets laptops activate front webcam if back was requested)
+    attempts.push({
+      cameraConfig: { facingMode: choice === "front" ? "environment" : "user" },
+      scanConfig: {
+        fps: 15,
+        disableFlip: choice !== "back",
+        videoConstraints: {
+          facingMode: { ideal: choice === "front" ? "environment" : "user" },
+        },
+      },
+      isAlternate: true,
+    });
 
-    // Try any enumerated cameras
+    // Attempt 5: Any enumerated device ID
     try {
       const devs = await Html5Qrcode.getCameras();
       if (devs && devs.length > 0) {
         devs.forEach((d) => {
-          if (d.id && !attempts.some((a) => a.deviceId?.exact === d.id)) {
-            attempts.push({ deviceId: { exact: d.id } });
+          if (d.id && d.id !== specificId) {
+            attempts.push({
+              cameraConfig: d.id,
+              scanConfig: {
+                fps: 15,
+                disableFlip: choice === "back",
+              },
+            });
           }
         });
       }
     } catch (e) {}
 
-    // Permissive constraints
-    attempts.push({ facingMode: { ideal: choice === "front" ? "user" : "environment" } });
-    attempts.push(true);
+    // Attempt 6: Permissive fallback
+    attempts.push({
+      cameraConfig: { facingMode: "user" },
+      scanConfig: { fps: 15 },
+    });
 
     let started = false;
     let lastError = null;
 
     for (let i = 0; i < attempts.length; i++) {
-      const config = attempts[i];
+      const attempt = attempts[i];
       try {
-        await scanner.start(config, qrConfig, onScanSuccess, () => {});
+        await scanner.start(attempt.cameraConfig, attempt.scanConfig, onScanSuccess, () => {});
         started = true;
+        isScanningRef.current = false;
+        setScannerPaused(false);
 
-        // Apply iOS WebKit / Safari video playback attributes immediately
-        setTimeout(() => {
+        // Configure video track capabilities (Autofocus, Torch, Zoom) & iOS WebKit playsinline
+        setTimeout(async () => {
           try {
             const v = document.querySelector("#qr-reader-box video");
             if (v) {
@@ -314,18 +533,43 @@ export default function VolunteerDashboard() {
               v.setAttribute("muted", "true");
               v.muted = true;
               v.play().catch(() => {});
-            }
-          } catch (e) {}
-        }, 50);
 
-        // If we succeeded using the opposite facing mode, update cameraChoice smoothly
-        if (config?.facingMode && config.facingMode !== (choice === "front" ? "user" : "environment")) {
-          setCameraChoice(config.facingMode === "user" ? "front" : "back");
+              if (v.srcObject && typeof v.srcObject.getVideoTracks === "function") {
+                const [track] = v.srcObject.getVideoTracks();
+                if (track) {
+                  cameraTrackRef.current = track;
+                  if (track.getCapabilities) {
+                    const caps = track.getCapabilities();
+                    if (caps.torch) setHasTorch(true);
+                    if (caps.zoom) setHasZoom(true);
+
+                    // Apply continuous focus and exposure if supported
+                    const adv = {};
+                    if (caps.focusMode && caps.focusMode.includes("continuous")) {
+                      adv.focusMode = "continuous";
+                    }
+                    if (caps.exposureMode && caps.exposureMode.includes("continuous")) {
+                      adv.exposureMode = "continuous";
+                    }
+                    if (Object.keys(adv).length > 0) {
+                      await track.applyConstraints({ advanced: [adv] }).catch(() => {});
+                    }
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.warn("Video surface enhancement error:", e);
+          }
+        }, 80);
+
+        if (attempt.isAlternate) {
+          setCameraChoice(choice === "front" ? "back" : "front");
         }
         break;
       } catch (err) {
         lastError = err;
-        console.warn(`Camera attempt ${i + 1}/${attempts.length} failed:`, config, err);
+        console.warn(`Camera start attempt ${i + 1}/${attempts.length} failed:`, attempt, err);
       }
     }
 
@@ -334,9 +578,9 @@ export default function VolunteerDashboard() {
       let errMsg = "Could not activate camera. Please ensure camera permissions are granted.";
       const errStr = String(lastError || "").toLowerCase();
       if (lastError?.name === "NotAllowedError" || errStr.includes("permission") || errStr.includes("denied")) {
-        errMsg = "Camera permission was denied. Please allow camera permissions in your browser or switch to 'Upload QR Image'.";
+        errMsg = "Camera permission was denied. Please allow camera permissions in your browser or switch to 'Upload QR'.";
       } else if (lastError?.name === "NotFoundError" || errStr.includes("not found")) {
-        errMsg = "No camera was detected on this device. You can try 'Upload QR Image' or enter the code manually.";
+        errMsg = "No camera was detected on this device. You can use 'Upload QR' or enter the code manually.";
       } else if (lastError?.name === "NotReadableError" || errStr.includes("in use") || errStr.includes("could not start")) {
         errMsg = "Camera is currently in use by another app or browser tab. Please close other camera apps and retry.";
       }
@@ -357,8 +601,9 @@ export default function VolunteerDashboard() {
           const box = document.getElementById("qr-reader-box");
           if (!box) return;
 
-          // Stop existing stream if any
+          // Stop existing stream if any before creating fresh instance
           await stopActiveStream();
+          if (!isMounted) return;
 
           const scanner = new Html5Qrcode("qr-reader-box", {
             formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
@@ -371,16 +616,18 @@ export default function VolunteerDashboard() {
           }
 
           // Asynchronously resolve logical cameras in background so switcher is ready
-          resolveLogicalCameras().then(({ backId, frontId, frontOk, backOk }) => {
-            if (isMounted) {
-              backCameraIdRef.current = backId;
-              frontCameraIdRef.current = frontId;
-              setHasFrontCamera(frontOk);
-              setHasBackCamera(backOk);
-            }
-          }).catch(() => {});
+          resolveLogicalCameras()
+            .then(({ backId, frontId, frontOk, backOk }) => {
+              if (isMounted) {
+                backCameraIdRef.current = backId;
+                frontCameraIdRef.current = frontId;
+                setHasFrontCamera(frontOk);
+                setHasBackCamera(backOk);
+              }
+            })
+            .catch(() => {});
         } catch (e) {
-          console.log("Camera scanner initialization error:", e);
+          console.warn("Camera scanner initialization error:", e);
         }
       };
 
@@ -406,14 +653,11 @@ export default function VolunteerDashboard() {
       await stopActiveStream();
       setCameraChoice(targetChoice);
 
-      let scanner = html5QrCodeInstance.current;
-      if (!scanner) {
-        scanner = new Html5Qrcode("qr-reader-box", {
-          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-          verbose: false,
-        });
-        html5QrCodeInstance.current = scanner;
-      }
+      const scanner = new Html5Qrcode("qr-reader-box", {
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        verbose: false,
+      });
+      html5QrCodeInstance.current = scanner;
 
       await startCameraStream(scanner, targetChoice);
       toast.success(`Switched to ${targetChoice === "back" ? "Back" : "Front"} Camera`);
@@ -432,7 +676,93 @@ export default function VolunteerDashboard() {
     await handleSelectCamera(nextChoice);
   };
 
-  // QR Image File Upload & Decoding Handler
+  // Torch / Flashlight Toggle Handler
+  const handleToggleTorch = async () => {
+    const track = cameraTrackRef.current;
+    if (!track) return;
+    try {
+      const nextTorch = !torchOn;
+      await track.applyConstraints({
+        advanced: [{ torch: nextTorch }],
+      });
+      setTorchOn(nextTorch);
+      toast.success(nextTorch ? "Flashlight ON" : "Flashlight OFF");
+    } catch (e) {
+      console.warn("Torch toggle failed:", e);
+      toast.error("Flashlight could not be toggled");
+    }
+  };
+
+  // Hardware Zoom Cycle Handler (1x -> 1.5x -> 2x -> 1x)
+  const handleCycleZoom = async () => {
+    const track = cameraTrackRef.current;
+    if (!track || !track.getCapabilities) return;
+    try {
+      const caps = track.getCapabilities();
+      if (!caps.zoom) return;
+      const minZoom = caps.zoom.min || 1;
+      const maxZoom = Math.min(caps.zoom.max || 3, 3);
+
+      let nextZoom = 1;
+      if (zoomLevel === 1) nextZoom = Math.min(1.5, maxZoom);
+      else if (zoomLevel === 1.5) nextZoom = Math.min(2.0, maxZoom);
+      else nextZoom = minZoom;
+
+      await track.applyConstraints({
+        advanced: [{ zoom: nextZoom }],
+      });
+      setZoomLevel(nextZoom);
+    } catch (e) {
+      console.warn("Zoom adjustment failed:", e);
+    }
+  };
+
+  // Restart camera scanner cleanly
+  const handleRestartScanner = async () => {
+    isScanningRef.current = false;
+    setVerifyError(null);
+    setCameraError(null);
+    setScannerPaused(false);
+    await stopActiveStream();
+    const box = document.getElementById("qr-reader-box");
+    if (!box) return;
+    try {
+      const scanner = new Html5Qrcode("qr-reader-box", {
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        verbose: false,
+      });
+      html5QrCodeInstance.current = scanner;
+      await startCameraStream(scanner, cameraChoice);
+    } catch (err) {
+      console.warn("Scanner restart error:", err);
+    }
+  };
+
+  // Pause / Resume camera scanner
+  const handleTogglePause = () => {
+    const scanner = html5QrCodeInstance.current;
+    if (!scanner) return;
+    try {
+      if (scannerPaused) {
+        scanner.resume();
+        setScannerPaused(false);
+      } else {
+        scanner.pause(true);
+        setScannerPaused(true);
+      }
+    } catch (e) {
+      console.warn("Could not toggle pause:", e);
+    }
+  };
+
+  // Clean modal close
+  const handleCloseScanner = async () => {
+    await stopActiveStream();
+    handleResetScanner();
+    setScannerOpen(false);
+  };
+
+  // QR Image File Upload & Decoding Handler with Two-Pass Preprocessing Fallback
   const handleFileUpload = async (file) => {
     if (!file) return;
 
@@ -442,8 +772,8 @@ export default function VolunteerDashboard() {
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("File size exceeds 10MB limit.");
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("File size exceeds 15MB limit.");
       return;
     }
 
@@ -453,14 +783,7 @@ export default function VolunteerDashboard() {
     setVerifyError(null);
 
     try {
-      // Stop live camera if running
-      if (html5QrCodeInstance.current) {
-        try {
-          if (html5QrCodeInstance.current.isScanning) {
-            await html5QrCodeInstance.current.stop();
-          }
-        } catch (e) {}
-      }
+      await stopActiveStream();
 
       let scanner = html5QrCodeInstance.current;
       if (!scanner) {
@@ -471,15 +794,30 @@ export default function VolunteerDashboard() {
         html5QrCodeInstance.current = scanner;
       }
 
-      const decodedText = await scanner.scanFile(file, true);
+      // Pass 1: Standard scanFile
+      let decodedText = null;
+      try {
+        decodedText = await scanner.scanFile(file, true);
+      } catch (pass1Error) {
+        // Pass 2: High-contrast canvas preprocessed fallback
+        try {
+          const preprocessedBlob = await preprocessImageForQR(file);
+          if (preprocessedBlob) {
+            decodedText = await scanner.scanFile(preprocessedBlob, false);
+          }
+        } catch (pass2Error) {
+          throw pass1Error;
+        }
+      }
+
       if (decodedText) {
-        toast.success("QR Code detected in image!");
+        toast.success("QR Code detected successfully!");
         await handleVerifyTicket(decodedText);
       }
     } catch (err) {
       console.error("QR decode from file error:", err);
       setVerifyError(
-        "No readable QR code found in this image. Please ensure the QR code is clearly visible, in-focus, and well-lit, or enter the code manually."
+        "No readable QR code found in this image. Please ensure the QR code is clearly visible, well-lit, and in focus, or enter the code manually."
       );
     } finally {
       setDecodingFile(false);
@@ -515,25 +853,15 @@ export default function VolunteerDashboard() {
   };
 
   const handleVerifyTicket = async (ticketPayload) => {
-    let raw = (ticketPayload || manualCode || "").trim();
-    if (!raw) {
-      toast.error("Please enter or scan a ticket code");
+    const input = ticketPayload || manualCode || "";
+    const { ticketCode, eventId: payloadEventId } = parseTicketPayload(
+      input,
+      selectedEventId ? parseInt(selectedEventId, 10) : null
+    );
+
+    if (!ticketCode) {
+      toast.error("Please enter or scan a valid ticket code");
       return;
-    }
-
-    // Extract code if a full URL was scanned or pasted
-    if (raw.includes("/ticket/")) {
-      const match = raw.match(/\/ticket\/([^/?#]+)/);
-      if (match && match[1]) raw = match[1];
-    } else if (raw.includes("/registrations/") && raw.includes("/qr")) {
-      const match = raw.match(/\/registrations\/(\d+)\/qr/);
-      if (match && match[1]) raw = `REG-${match[1]}`;
-    }
-
-    // Strip leading hash (#) and normalize
-    let code = raw;
-    if (!raw.includes("TICKET:") && !raw.includes("|")) {
-      code = raw.replace(/^#+/, "").trim().toUpperCase();
     }
 
     try {
@@ -547,25 +875,33 @@ export default function VolunteerDashboard() {
     setVerifiedAttendee(null);
     setConfirmedSuccess(null);
 
+    const targetEventId = selectedEventId ? parseInt(selectedEventId, 10) : payloadEventId;
+
     try {
       const { data } = await volunteerService.verifyTicket({
-        ticket_code: code,
-        event_id: selectedEventId ? parseInt(selectedEventId) : null,
+        ticket_code: ticketCode,
+        event_id: targetEventId,
       });
+
       setVerifiedAttendee(data);
+
+      // Stop camera while viewing attendee verification card to save device resources
+      await stopActiveStream();
+
       if (data.already_attended) {
         setVerifyError("⚠️ Attendance has already been confirmed for this student.");
       }
     } catch (err) {
-      const detail = err.response?.data?.detail || "Registration not found or invalid QR.";
+      const detail = err.response?.data?.detail || "Registration not found or invalid QR code.";
       setVerifyError(detail);
+      isScanningRef.current = false;
     } finally {
       setVerifying(false);
     }
   };
 
   const handleConfirmAttendance = async () => {
-    if (!verifiedAttendee) return;
+    if (!verifiedAttendee || confirming) return;
     setConfirming(true);
     try {
       const { data } = await volunteerService.confirmAttendance({
@@ -592,6 +928,7 @@ export default function VolunteerDashboard() {
     setVerifyError(null);
     setConfirmedSuccess(null);
     setManualCode("");
+    setScannerPaused(false);
   };
 
   const openScannerForEvent = (eventId) => {
@@ -1183,8 +1520,7 @@ export default function VolunteerDashboard() {
                   }}
                   onClick={(e) => {
                     if (e.target === e.currentTarget) {
-                      stopActiveStream();
-                      setScannerOpen(false);
+                      handleCloseScanner();
                     }
                   }}
                 >
@@ -1223,6 +1559,24 @@ export default function VolunteerDashboard() {
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <button
+                      type="button"
+                      onClick={handleCloseScanner}
+                      className="btn btn-sm btn-outline"
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: 12,
+                        borderRadius: 8,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                        cursor: "pointer",
+                      }}
+                      title="Back to Dashboard"
+                    >
+                      <FiArrowLeft size={14} />
+                      <span>Back</span>
+                    </button>
                     <div
                       style={{
                         width: 32,
@@ -1271,10 +1625,7 @@ export default function VolunteerDashboard() {
                     )}
                     <button
                       type="button"
-                      onClick={() => {
-                        stopActiveStream();
-                        setScannerOpen(false);
-                      }}
+                      onClick={handleCloseScanner}
                       style={{
                         background: "none",
                         border: "none",
@@ -1334,20 +1685,41 @@ export default function VolunteerDashboard() {
                       <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: "0 0 16px 0" }}>
                         {confirmedSuccess.event_title} • {confirmedSuccess.checked_in_at}
                       </p>
-                      <button
-                        type="button"
-                        onClick={handleResetScanner}
-                        className="btn btn-primary"
-                        style={{
-                          width: "100%",
-                          padding: "12px",
-                          fontSize: 14.5,
-                          fontWeight: 700,
-                          borderRadius: 12,
-                        }}
-                      >
-                        Scan Next Attendee
-                      </button>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <button
+                          type="button"
+                          onClick={handleResetScanner}
+                          className="btn btn-primary"
+                          style={{
+                            flex: 2,
+                            padding: "12px",
+                            fontSize: 14,
+                            fontWeight: 700,
+                            borderRadius: 12,
+                          }}
+                        >
+                          Scan Next Attendee
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCloseScanner}
+                          className="btn btn-outline"
+                          style={{
+                            flex: 1,
+                            padding: "12px",
+                            fontSize: 14,
+                            fontWeight: 600,
+                            borderRadius: 12,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 6,
+                          }}
+                        >
+                          <FiArrowLeft size={16} />
+                          <span>Back</span>
+                        </button>
+                      </div>
                     </motion.div>
                   )}
 
@@ -1436,9 +1808,10 @@ export default function VolunteerDashboard() {
                           type="button"
                           onClick={handleResetScanner}
                           className="btn btn-outline btn-sm"
-                          style={{ flex: 1, padding: "10px", borderRadius: 10, fontSize: 13 }}
+                          style={{ flex: 1, padding: "10px", borderRadius: 10, fontSize: 13, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
                         >
-                          Cancel / Next
+                          <FiArrowLeft size={14} />
+                          <span>Back to Scan</span>
                         </button>
                         <button
                           type="button"
@@ -1519,186 +1892,345 @@ export default function VolunteerDashboard() {
                       </div>
 
                       {/* MODE A: LIVE CAMERA */}
-                      {scannerMode === "camera" && (
-                        <div>
-                          {cameraError && (
-                            <div
-                              style={{
-                                padding: "10px 12px",
-                                borderRadius: 10,
-                                background: "rgba(239, 68, 68, 0.1)",
-                                border: "1px solid rgba(239, 68, 68, 0.3)",
-                                color: "#fca5a5",
-                                fontSize: 12,
-                                marginBottom: 10,
-                              }}
-                            >
-                              <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, marginBottom: 4 }}>
-                                <FiAlertCircle size={14} /> Camera Notice
-                              </div>
-                              <div style={{ marginBottom: 8 }}>{cameraError}</div>
-                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleSelectCamera(cameraChoice)}
-                                  className="btn btn-sm btn-outline"
-                                  style={{ fontSize: 11, padding: "4px 10px" }}
-                                >
-                                  <FiRefreshCw size={11} /> Retry
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setScannerMode("upload")}
-                                  className="btn btn-sm btn-primary"
-                                  style={{ fontSize: 11, padding: "4px 10px" }}
-                                >
-                                  <FiUpload size={11} /> Upload QR
-                                </button>
-                              </div>
+                      <div style={{ display: scannerMode === "camera" ? "block" : "none" }}>
+                        {cameraError && (
+                          <div
+                            style={{
+                              padding: "10px 12px",
+                              borderRadius: 10,
+                              background: "rgba(239, 68, 68, 0.1)",
+                              border: "1px solid rgba(239, 68, 68, 0.3)",
+                              color: "#fca5a5",
+                              fontSize: 12,
+                              marginBottom: 10,
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, marginBottom: 4 }}>
+                              <FiAlertCircle size={14} /> Camera Notice
                             </div>
-                          )}
+                            <div style={{ marginBottom: 8 }}>{cameraError}</div>
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              <button
+                                type="button"
+                                onClick={() => handleSelectCamera(cameraChoice)}
+                                className="btn btn-sm btn-outline"
+                                style={{ fontSize: 11, padding: "4px 10px" }}
+                              >
+                                <FiRefreshCw size={11} /> Retry
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setScannerMode("upload")}
+                                className="btn btn-sm btn-primary"
+                                style={{ fontSize: 11, padding: "4px 10px" }}
+                              >
+                                <FiUpload size={11} /> Upload QR
+                              </button>
+                            </div>
+                          </div>
+                        )}
 
-                          {/* Front-and-Center Live Camera Viewfinder Box (No Scroll Needed!) */}
+                        {/* Front-and-Center Live Camera Viewfinder Box with High-Aesthetic Glassmorphism Reticle */}
+                        <div style={{ position: "relative", width: "100%", borderRadius: 16, overflow: "hidden", background: "#000" }}>
                           <div
                             id="qr-reader-box"
                             style={{
                               width: "100%",
                               minHeight: 220,
-                              maxHeight: "clamp(220px, 34vh, 270px)",
                               background: "#000",
-                              borderRadius: 14,
+                              borderRadius: 16,
                               overflow: "hidden",
                               position: "relative",
                               border: "1.5px solid rgba(139, 92, 246, 0.4)",
                             }}
                           />
-                        </div>
-                      )}
 
-                      {/* MODE B: UPLOAD QR IMAGE */}
-                      {scannerMode === "upload" && (
-                        <div>
-                          <input
-                            type="file"
-                            ref={fileInputRef}
-                            accept="image/png, image/jpeg, image/jpg, image/webp"
-                            style={{ display: "none" }}
-                            onChange={(e) => {
-                              if (e.target.files && e.target.files[0]) {
-                                handleFileUpload(e.target.files[0]);
-                              }
-                            }}
-                          />
-
-                          {!uploadedPreview ? (
+                          {!cameraError && !cameraLoading && (
                             <div
-                              onClick={() => fileInputRef.current?.click()}
-                              onDragOver={(e) => e.preventDefault()}
-                              onDrop={(e) => {
-                                e.preventDefault();
-                                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                                  handleFileUpload(e.dataTransfer.files[0]);
-                                }
-                              }}
                               style={{
-                                border: "2px dashed rgba(139, 92, 246, 0.5)",
-                                borderRadius: 14,
-                                padding: "24px 14px",
-                                textAlign: "center",
-                                cursor: "pointer",
-                                background: "rgba(139, 92, 246, 0.05)",
-                                transition: "all 0.2s ease",
+                                position: "absolute",
+                                inset: 0,
+                                pointerEvents: "none",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                zIndex: 5,
                               }}
                             >
                               <div
                                 style={{
-                                  width: 40,
-                                  height: 40,
-                                  borderRadius: "50%",
-                                  background: "rgba(139, 92, 246, 0.15)",
-                                  color: "#8b5cf6",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  margin: "0 auto 8px",
-                                  fontSize: 18,
+                                  width: "65%",
+                                  height: "65%",
+                                  maxWidth: 210,
+                                  maxHeight: 210,
+                                  position: "relative",
+                                  border: "1.5px solid rgba(168, 85, 247, 0.4)",
+                                  borderRadius: 16,
+                                  boxShadow: "0 0 30px rgba(139, 92, 246, 0.25)",
                                 }}
                               >
-                                <FiUpload />
+                                {!scannerPaused && <div className="qr-laser-line" />}
+                                <div className="reticle-corner reticle-tl" />
+                                <div className="reticle-corner reticle-tr" />
+                                <div className="reticle-corner reticle-bl" />
+                                <div className="reticle-corner reticle-br" />
                               </div>
-                              <h4 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 2px 0", color: "var(--text-primary)" }}>
-                                Select or Drop QR Code Image
-                              </h4>
-                              <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: 0 }}>
-                                Tap to pick screenshot or image from gallery
-                              </p>
-                            </div>
-                          ) : (
-                            <div
-                              style={{
-                                borderRadius: 14,
-                                padding: 12,
-                                background: "var(--bg-glass)",
-                                border: "1px solid var(--border-color)",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 12,
-                              }}
-                            >
-                              <img
-                                src={uploadedPreview}
-                                alt="QR Preview"
+
+                              <div
                                 style={{
-                                  width: 60,
-                                  height: 60,
-                                  objectFit: "cover",
-                                  borderRadius: 10,
-                                  border: "1px solid var(--border-color)",
+                                  position: "absolute",
+                                  bottom: 8,
+                                  background: "rgba(15, 23, 42, 0.85)",
+                                  backdropFilter: "blur(8px)",
+                                  WebkitBackdropFilter: "blur(8px)",
+                                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                                  color: "#e2e8f0",
+                                  padding: "3px 12px",
+                                  borderRadius: 999,
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  letterSpacing: "0.02em",
+                                  textAlign: "center",
+                                  maxWidth: "92%",
                                 }}
-                              />
-                              <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-primary)", marginBottom: 2 }}>
-                                  {uploadedFile?.name || "QR Image"}
-                                </div>
-                                <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginBottom: 6 }}>
-                                  {decodingFile ? (
-                                    <span style={{ color: "#8b5cf6", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                                      <FiRefreshCw className="spin-icon" size={11} /> Decoding...
-                                    </span>
-                                  ) : (
-                                    "Ready to verify"
-                                  )}
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={handleClearUploadedFile}
-                                  className="btn btn-sm btn-outline"
-                                  style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6 }}
-                                >
-                                  Replace
-                                </button>
+                              >
+                                {scannerPaused ? "⏸ Scanner Paused" : "Align QR inside reticle • 15–25 cm distance"}
                               </div>
                             </div>
                           )}
                         </div>
-                      )}
+
+                        {/* Mobile Camera Action Controls Toolbar (Torch, Zoom, Pause, Restart, Switch) */}
+                        <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                          {hasTorch && (
+                            <button
+                              type="button"
+                              onClick={handleToggleTorch}
+                              disabled={cameraLoading || !!cameraError}
+                              className="btn btn-sm"
+                              style={{
+                                fontSize: 11,
+                                padding: "4px 9px",
+                                borderRadius: 8,
+                                background: torchOn ? "rgba(234, 179, 8, 0.25)" : "var(--bg-glass)",
+                                color: torchOn ? "#facc15" : "var(--text-secondary)",
+                                border: torchOn ? "1px solid #facc15" : "1px solid var(--border-color)",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                              }}
+                              title="Toggle Flashlight / Torch"
+                            >
+                              <FiZap size={12} />
+                              <span>{torchOn ? "Torch ON" : "Torch"}</span>
+                            </button>
+                          )}
+
+                          {hasZoom && (
+                            <button
+                              type="button"
+                              onClick={handleCycleZoom}
+                              disabled={cameraLoading || !!cameraError}
+                              className="btn btn-sm btn-outline"
+                              style={{ fontSize: 11, padding: "4px 9px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}
+                              title="Cycle Camera Zoom Level"
+                            >
+                              <span>🔍 {zoomLevel}x</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={handleTogglePause}
+                            disabled={cameraLoading || !!cameraError}
+                            className="btn btn-sm btn-outline"
+                            style={{ fontSize: 11, padding: "4px 9px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}
+                            title={scannerPaused ? "Resume Scanning" : "Pause Scanning"}
+                          >
+                            {scannerPaused ? <FiPlay size={12} /> : <FiPause size={12} />}
+                            <span>{scannerPaused ? "Resume" : "Pause"}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleRestartScanner}
+                            disabled={cameraLoading}
+                            className="btn btn-sm btn-outline"
+                            style={{ fontSize: 11, padding: "4px 9px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}
+                            title="Restart Camera Scanner"
+                          >
+                            <FiRefreshCw size={12} className={cameraLoading ? "spin-icon" : ""} />
+                            <span>Restart</span>
+                          </button>
+
+                          {(hasFrontCamera || hasBackCamera) && (
+                            <button
+                              type="button"
+                              onClick={handleSwitchCamera}
+                              disabled={switchingCamera || cameraLoading}
+                              className="btn btn-sm btn-outline"
+                              style={{ fontSize: 11, padding: "4px 9px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}
+                              title="Switch Camera (Rear / Front)"
+                            >
+                              <FiRepeat size={12} className={switchingCamera ? "spin-icon" : ""} />
+                              <span>{cameraChoice === "back" ? "Front" : "Back"}</span>
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Mobile Scanning Instructions */}
+                        <p style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", margin: "6px 0 0 0" }}>
+                          💡 If scanning another phone, tilt slightly to avoid screen glare. Hold steady for autofocus.
+                        </p>
+                      </div>
+
+                      {/* MODE B: UPLOAD QR IMAGE */}
+                      <div style={{ display: scannerMode === "upload" ? "block" : "none" }}>
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          accept="image/png, image/jpeg, image/jpg, image/webp"
+                          style={{ display: "none" }}
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              handleFileUpload(e.target.files[0]);
+                            }
+                          }}
+                        />
+
+                        {!uploadedPreview ? (
+                          <div
+                            onClick={() => fileInputRef.current?.click()}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                handleFileUpload(e.dataTransfer.files[0]);
+                              }
+                            }}
+                            style={{
+                              border: "2px dashed rgba(139, 92, 246, 0.5)",
+                              borderRadius: 14,
+                              padding: "24px 14px",
+                              textAlign: "center",
+                              cursor: "pointer",
+                              background: "rgba(139, 92, 246, 0.05)",
+                              transition: "all 0.2s ease",
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: "50%",
+                                background: "rgba(139, 92, 246, 0.15)",
+                                color: "#8b5cf6",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                margin: "0 auto 8px",
+                                fontSize: 18,
+                              }}
+                            >
+                              <FiUpload />
+                            </div>
+                            <h4 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 2px 0", color: "var(--text-primary)" }}>
+                              Select or Drop QR Code Image
+                            </h4>
+                            <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: 0 }}>
+                              Tap to pick screenshot or image from gallery
+                            </p>
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              borderRadius: 14,
+                              padding: 12,
+                              background: "var(--bg-glass)",
+                              border: "1px solid var(--border-color)",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 12,
+                            }}
+                          >
+                            <img
+                              src={uploadedPreview}
+                              alt="QR Preview"
+                              style={{
+                                width: 60,
+                                height: 60,
+                                objectFit: "cover",
+                                borderRadius: 10,
+                                border: "1px solid var(--border-color)",
+                              }}
+                            />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-primary)", marginBottom: 2 }}>
+                                {uploadedFile?.name || "QR Image"}
+                              </div>
+                              <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginBottom: 6 }}>
+                                {decodingFile ? (
+                                  <span style={{ color: "#8b5cf6", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                    <FiRefreshCw className="spin-icon" size={11} /> Decoding...
+                                  </span>
+                                ) : (
+                                  "Ready to verify"
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={handleClearUploadedFile}
+                                className="btn btn-sm btn-outline"
+                                style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6 }}
+                              >
+                                Replace
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
                       {verifyError && (
                         <div
                           style={{
-                            padding: "8px 12px",
+                            padding: "10px 12px",
                             borderRadius: 10,
-                            background: "rgba(239, 68, 68, 0.1)",
-                            border: "1px solid rgba(239, 68, 68, 0.3)",
+                            background: "rgba(239, 68, 68, 0.12)",
+                            border: "1px solid rgba(239, 68, 68, 0.35)",
                             color: "#fca5a5",
                             fontSize: 12,
                             marginTop: 8,
                             display: "flex",
                             alignItems: "center",
-                            gap: 6,
+                            justifyContent: "space-between",
+                            gap: 8,
                           }}
                         >
-                          <FiAlertCircle size={14} /> {verifyError}
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
+                            <FiAlertCircle size={15} style={{ flexShrink: 0 }} />
+                            <span>{verifyError}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleRestartScanner}
+                            className="btn btn-sm"
+                            style={{
+                              padding: "4px 10px",
+                              fontSize: 11,
+                              borderRadius: 6,
+                              background: "rgba(239, 68, 68, 0.2)",
+                              color: "#fff",
+                              border: "1px solid rgba(239, 68, 68, 0.4)",
+                              cursor: "pointer",
+                              whiteSpace: "nowrap",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            <FiRefreshCw size={11} /> Scan Again
+                          </button>
                         </div>
                       )}
 
@@ -1708,7 +2240,7 @@ export default function VolunteerDashboard() {
                           <input
                             type="text"
                             className="form-input"
-                            placeholder="Or type code (e.g. ESP-12345)..."
+                            placeholder="Or type code (e.g. ESP-12345, BA6436533EF14244)..."
                             value={manualCode}
                             onChange={(e) => setManualCode(e.target.value)}
                             onKeyDown={(e) => {
@@ -1734,41 +2266,67 @@ export default function VolunteerDashboard() {
                 <style>{`
                   #qr-reader-box {
                     width: 100% !important;
-                    min-height: 220px !important;
-                    max-height: clamp(220px, 34vh, 270px) !important;
-                    background: #000 !important;
-                    border-radius: 14px !important;
+                    max-width: 380px !important;
+                    margin: 0 auto !important;
+                    background: #000000 !important;
+                    border-radius: 16px !important;
                     overflow: hidden !important;
                     position: relative !important;
                   }
-                  #qr-reader-box video {
+                  #qr-reader-box video,
+                  #qr-reader-box__scan_region video {
                     width: 100% !important;
-                    height: 100% !important;
-                    min-height: 220px !important;
-                    max-height: clamp(220px, 34vh, 270px) !important;
-                    object-fit: cover !important;
+                    height: auto !important;
+                    max-height: 50vh !important;
+                    object-fit: contain !important;
                     border-radius: 14px !important;
                     display: block !important;
+                    margin: 0 auto !important;
                     -webkit-transform: translateZ(0);
                     transform: translateZ(0);
                   }
                   #qr-reader-box__scan_region {
                     width: 100% !important;
-                    height: 100% !important;
-                    min-height: 220px !important;
-                    max-height: clamp(220px, 34vh, 270px) !important;
+                    height: auto !important;
                     background: transparent !important;
                     display: flex !important;
                     align-items: center !important;
                     justify-content: center !important;
                   }
-                  #qr-reader-box__scan_region video {
-                    object-fit: cover !important;
+                  #qr-reader-box canvas {
+                    display: none !important;
                   }
                   #qr-reader-box__dashboard_section,
+                  #qr-reader-box__dashboard,
                   #qr-reader-box__header_message {
                     display: none !important;
                   }
+                  @keyframes qrLaserMove {
+                    0% { top: 6px; opacity: 0.3; }
+                    50% { opacity: 1; }
+                    100% { top: calc(100% - 8px); opacity: 0.3; }
+                  }
+                  .qr-laser-line {
+                    position: absolute;
+                    left: 6px;
+                    right: 6px;
+                    height: 2.5px;
+                    background: linear-gradient(90deg, transparent, #c084fc, #6366f1, transparent);
+                    box-shadow: 0 0 12px #c084fc, 0 0 5px #6366f1;
+                    border-radius: 999px;
+                    animation: qrLaserMove 1.8s ease-in-out infinite alternate;
+                  }
+                  .reticle-corner {
+                    position: absolute;
+                    width: 18px;
+                    height: 18px;
+                    border-color: #c084fc;
+                    border-style: solid;
+                  }
+                  .reticle-tl { top: -2px; left: -2px; border-width: 3px 0 0 3px; border-top-left-radius: 8px; }
+                  .reticle-tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; border-top-right-radius: 8px; }
+                  .reticle-bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; border-bottom-left-radius: 8px; }
+                  .reticle-br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; border-bottom-right-radius: 8px; }
                 `}</style>
               </motion.div>
             </div>

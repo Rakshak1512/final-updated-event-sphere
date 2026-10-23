@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { FiCamera, FiMail, FiSave } from "react-icons/fi";
+import { FiCamera, FiMail, FiSave, FiEye, FiEyeOff } from "react-icons/fi";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { userService } from "../../api/services.js";
 import { fileUrl, initials } from "../../utils/format.js";
@@ -15,6 +15,7 @@ export default function Profile() {
     semester: user?.semester || "",
   });
   const [emailForm, setEmailForm] = useState({ new_email: "", password: "" });
+  const [showPassword, setShowPassword] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingEmail, setSavingEmail] = useState(false);
   const [uploadingPic, setUploadingPic] = useState(false);
@@ -138,7 +139,37 @@ export default function Profile() {
             </div>
             <div className="form-group">
               <label className="form-label">Confirm Current Password</label>
-              <input className="form-input" type="password" value={emailForm.password} onChange={(e) => setEmailForm((f) => ({ ...f, password: e.target.value }))} placeholder="••••••••" />
+              <div style={{ position: "relative" }}>
+                <input
+                  className="form-input"
+                  type={showPassword ? "text" : "password"}
+                  value={emailForm.password}
+                  onChange={(e) => setEmailForm((f) => ({ ...f, password: e.target.value }))}
+                  placeholder="••••••••"
+                  style={{ paddingRight: 38 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  style={{
+                    position: "absolute",
+                    right: 12,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none",
+                    border: "none",
+                    color: "var(--text-muted)",
+                    cursor: "pointer",
+                    padding: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    fontSize: 16,
+                  }}
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <FiEyeOff /> : <FiEye />}
+                </button>
+              </div>
             </div>
             <button className="btn btn-primary" disabled={savingEmail}>
               {savingEmail ? "Updating..." : "Update Email"}

@@ -51,8 +51,8 @@ def verify_ticket(
     )
     if not ok:
         if attendee_info and attendee_info.get("already_attended"):
-            # Return 400 with message "Attendance already confirmed."
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Attendance already confirmed.")
+            # Return attendee verification details with already_attended=True for visual inspection and UI disabling
+            return AttendeeVerificationOut(**attendee_info)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
 
     return AttendeeVerificationOut(**attendee_info)
