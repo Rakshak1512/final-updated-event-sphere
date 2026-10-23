@@ -511,17 +511,25 @@ export default function ForgotPassword() {
                     aria-label="Toggle password visibility"
                     style={{
                       position: "absolute",
-                      right: 12,
-                      top: "50%",
-                      transform: "translateY(-50%)",
+                      right: 8,
+                      top: 0,
+                      bottom: 0,
+                      margin: "auto 0",
                       background: "none",
                       border: "none",
                       color: "var(--text-muted)",
                       cursor: "pointer",
-                      padding: 4,
+                      width: 40,
+                      height: 40,
+                      padding: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      pointerEvents: "auto",
+                      zIndex: 10,
                     }}
                   >
-                    {showPassword ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                    {showPassword ? <FiEye size={18} color="#8b5cf6" /> : <FiEyeOff size={18} />}
                   </button>
                 </div>
               </div>
@@ -566,17 +574,25 @@ export default function ForgotPassword() {
                     aria-label="Toggle password visibility"
                     style={{
                       position: "absolute",
-                      right: 12,
-                      top: "50%",
-                      transform: "translateY(-50%)",
+                      right: 8,
+                      top: 0,
+                      bottom: 0,
+                      margin: "auto 0",
                       background: "none",
                       border: "none",
                       color: "var(--text-muted)",
                       cursor: "pointer",
-                      padding: 4,
+                      width: 40,
+                      height: 40,
+                      padding: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      pointerEvents: "auto",
+                      zIndex: 10,
                     }}
                   >
-                    {showConfirmPassword ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                    {showConfirmPassword ? <FiEye size={18} color="#8b5cf6" /> : <FiEyeOff size={18} />}
                   </button>
                 </div>
               </div>

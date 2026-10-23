@@ -451,21 +451,26 @@ export default function Register() {
                     onClick={() => setShowPassword((s) => !s)}
                     style={{
                       position: "absolute",
-                      right: 12,
-                      top: "50%",
-                      transform: "translateY(-50%)",
+                      right: 8,
+                      top: 0,
+                      bottom: 0,
+                      margin: "auto 0",
                       background: "none",
                       border: "none",
                       color: "var(--text-muted)",
                       cursor: "pointer",
+                      width: 40,
+                      height: 40,
                       padding: 0,
                       display: "flex",
                       alignItems: "center",
-                      fontSize: 16,
+                      justifyContent: "center",
+                      pointerEvents: "auto",
+                      zIndex: 10,
                     }}
                     title={showPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? <FiEyeOff /> : <FiEye />}
+                    {showPassword ? <FiEye size={18} color="#8b5cf6" /> : <FiEyeOff size={18} />}
                   </button>
                 </div>
                 {errors.password && <span className="form-error">{errors.password}</span>}
@@ -487,21 +492,26 @@ export default function Register() {
                     onClick={() => setShowConfirmPassword((s) => !s)}
                     style={{
                       position: "absolute",
-                      right: 12,
-                      top: "50%",
-                      transform: "translateY(-50%)",
+                      right: 8,
+                      top: 0,
+                      bottom: 0,
+                      margin: "auto 0",
                       background: "none",
                       border: "none",
                       color: "var(--text-muted)",
                       cursor: "pointer",
+                      width: 40,
+                      height: 40,
                       padding: 0,
                       display: "flex",
                       alignItems: "center",
-                      fontSize: 16,
+                      justifyContent: "center",
+                      pointerEvents: "auto",
+                      zIndex: 10,
                     }}
                     title={showConfirmPassword ? "Hide password" : "Show password"}
                   >
-                    {showConfirmPassword ? <FiEyeOff /> : <FiEye />}
+                    {showConfirmPassword ? <FiEye size={18} color="#8b5cf6" /> : <FiEyeOff size={18} />}
                   </button>
                 </div>
                 {errors.confirm_password && <span className="form-error">{errors.confirm_password}</span>}

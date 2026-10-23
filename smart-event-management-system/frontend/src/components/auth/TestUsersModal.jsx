@@ -89,7 +89,10 @@ export default function TestUsersModal({ isOpen, onClose, onUseAccount, onLoginN
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "16px",
+        padding: "12px",
+        overflow: "hidden",
+        touchAction: "pan-y",
+        boxSizing: "border-box",
       }}
     >
       {/* Backdrop */}
@@ -101,6 +104,7 @@ export default function TestUsersModal({ isOpen, onClose, onUseAccount, onLoginN
           background: "rgba(5, 7, 18, 0.78)",
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
+          touchAction: "none",
         }}
       />
 
@@ -109,15 +113,17 @@ export default function TestUsersModal({ isOpen, onClose, onUseAccount, onLoginN
         style={{
           position: "relative",
           width: "100%",
-          maxWidth: 620,
-          maxHeight: "90vh",
+          maxWidth: 600,
+          maxHeight: "88vh",
           display: "flex",
           flexDirection: "column",
-          borderRadius: "24px",
+          borderRadius: "22px",
           background: "var(--bg-elevated)",
           border: "1.5px solid rgba(139, 92, 246, 0.38)",
           boxShadow: "0 28px 70px rgba(0, 0, 0, 0.55), 0 0 40px rgba(139, 92, 246, 0.22)",
           overflow: "hidden",
+          touchAction: "pan-y",
+          boxSizing: "border-box",
           zIndex: 10,
         }}
       >
@@ -240,11 +246,17 @@ export default function TestUsersModal({ isOpen, onClose, onUseAccount, onLoginN
             {/* Account Cards List (Scrollable) */}
             <div
               style={{
-                padding: "18px 24px 24px",
+                padding: "14px 16px 20px",
                 overflowY: "auto",
-                display: "grid",
-                gridTemplateColumns: "1fr",
-                gap: 14,
+                overflowX: "hidden",
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+                width: "100%",
+                maxWidth: "100%",
+                boxSizing: "border-box",
+                touchAction: "pan-y",
+                overscrollBehavior: "contain",
               }}
             >
               {filteredAccounts.map((account) => {
@@ -256,11 +268,15 @@ export default function TestUsersModal({ isOpen, onClose, onUseAccount, onLoginN
                       borderRadius: "16px",
                       background: "var(--bg-base)",
                       border: "1px solid var(--border-color)",
-                      padding: "16px 18px",
+                      padding: "14px 16px",
                       display: "flex",
                       flexDirection: "column",
-                      gap: 12,
+                      gap: 10,
                       position: "relative",
+                      width: "100%",
+                      maxWidth: "100%",
+                      boxSizing: "border-box",
+                      overflowX: "hidden",
                       transition: "border-color 0.2s ease, box-shadow 0.2s ease",
                     }}
                     onMouseEnter={(e) => {
@@ -411,7 +427,7 @@ export default function TestUsersModal({ isOpen, onClose, onUseAccount, onLoginN
                             }}
                             aria-label={isRevealed ? "Hide password" : "Show password"}
                           >
-                            {isRevealed ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                            {isRevealed ? <FiEye size={16} color="#8b5cf6" /> : <FiEyeOff size={16} />}
                           </button>
                         </div>
                       </div>

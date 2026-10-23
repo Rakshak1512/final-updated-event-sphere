@@ -378,17 +378,18 @@ export default function Login() {
                     }}
                     style={{
                       position: "absolute",
-                      right: 10,
-                      top: "50%",
-                      transform: "translateY(-50%)",
+                      right: 8,
+                      top: 0,
+                      bottom: 0,
+                      margin: "auto 0",
                       background: "none",
                       border: "none",
                       color: "var(--text-muted)",
                       cursor: "pointer",
                       pointerEvents: "auto",
                       zIndex: 10,
-                      width: 36,
-                      height: 36,
+                      width: 40,
+                      height: 40,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -396,7 +397,7 @@ export default function Login() {
                     }}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                    {showPassword ? <FiEye size={18} color="#8b5cf6" /> : <FiEyeOff size={18} />}
                   </button>
                 </div>
                 {errors.password && <span className="form-error">{errors.password}</span>}
