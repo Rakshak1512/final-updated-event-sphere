@@ -26,7 +26,7 @@ import PageTransition from "../../components/common/PageTransition.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { volunteerService } from "../../api/services.js";
 import { generateVolunteerScansPDF } from "../../utils/pdfReportGenerator.js";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 
 export default function VolunteerDashboard() {
   const { user } = useAuth();
@@ -96,16 +96,21 @@ export default function VolunteerDashboard() {
   }, []);
 
   // Completely stop any running camera stream to guarantee only one stream is active at a time
-  // and release all camera hardware tracks
+  // and release all camera hardware tracks cleanly
   const stopActiveStream = async () => {
     if (html5QrCodeInstance.current) {
+      const instance = html5QrCodeInstance.current;
+      html5QrCodeInstance.current = null;
       try {
-        if (html5QrCodeInstance.current.isScanning) {
-          await html5QrCodeInstance.current.stop();
+        if (instance.isScanning) {
+          await instance.stop();
         }
       } catch (e) {
         // Ignore expected teardown errors
       }
+      try {
+        instance.clear();
+      } catch (e) {}
     }
     // Also explicitly find any active video elements or media streams and stop all tracks
     try {
@@ -135,12 +140,23 @@ export default function VolunteerDashboard() {
   }, [scannerOpen]);
 
   // Enumerate cameras and filter exclusively for the primary standard Front and Back cameras
-  // Ignores wide-angle, ultra-wide, telephoto, macro, virtual, or depth cameras
+  // Robust against laptops (webcam), iPhones, iPads, and Android devices
   const resolveLogicalCameras = async () => {
     try {
       const devices = await Html5Qrcode.getCameras();
       if (!devices || devices.length === 0) {
-        return { backId: null, frontId: null, frontOk: true, backOk: true };
+        return { backId: null, frontId: null, frontOk: true, backOk: true, count: 0 };
+      }
+
+      // If only 1 camera is detected (e.g. laptop webcam, desktop webcam, single-camera tablet)
+      if (devices.length === 1) {
+        return {
+          backId: devices[0].id,
+          frontId: devices[0].id,
+          frontOk: true,
+          backOk: true,
+          count: 1,
+        };
       }
 
       const isSpecialLens = (label) => {
@@ -156,7 +172,7 @@ export default function VolunteerDashboard() {
         );
       };
 
-      // 1. Resolve standard Back camera (excluding special auxiliary lenses)
+      // 1. Resolve standard Back camera (excluding auxiliary lenses)
       const standardBack = devices.filter((d) => {
         const l = (d.label || "").toLowerCase();
         return (l.includes("back") || l.includes("rear") || l.includes("environment")) && !isSpecialLens(l);
@@ -180,24 +196,26 @@ export default function VolunteerDashboard() {
             return l.includes("front") || l.includes("user") || l.includes("selfie") || l.includes("facetime");
           });
 
-      const frontPresent = anyFront !== undefined || (devices.length === 1 && !anyBack);
-      const backPresent = anyBack !== undefined || (devices.length === 1 && anyBack !== undefined);
+      const resolvedBack = anyBack ? anyBack.id : devices[0]?.id;
+      const resolvedFront = anyFront ? anyFront.id : (devices[devices.length - 1]?.id || devices[0]?.id);
 
       return {
-        backId: anyBack ? anyBack.id : null,
-        frontId: anyFront ? anyFront.id : null,
-        frontOk: frontPresent,
-        backOk: backPresent,
+        backId: resolvedBack,
+        frontId: resolvedFront,
+        frontOk: true,
+        backOk: true,
+        count: devices.length,
       };
     } catch (e) {
       console.warn("Could not inspect camera devices:", e);
-      return { backId: null, frontId: null, frontOk: true, backOk: true };
+      return { backId: null, frontId: null, frontOk: true, backOk: true, count: 0 };
     }
   };
 
-  // Helper to start the live camera stream for the selected camera choice ("back" or "front")
+  // Helper to start the live camera stream with bulletproof multi-ladder fallback for all platforms:
+  // Laptop webcam, Android phone/tablet, iPhone, iPad Safari, external USB cameras
   const startCameraStream = async (scanner, targetChoice) => {
-    const choice = targetChoice || cameraChoice;
+    let choice = targetChoice || cameraChoice || "back";
     setCameraLoading(true);
     setCameraError(null);
 
@@ -213,75 +231,115 @@ export default function VolunteerDashboard() {
     // Stop current stream before starting another
     await stopActiveStream();
 
-    // Use specific deviceId if resolved, otherwise facingMode standard constraint
-    const primaryConfig = choice === "front"
-      ? (frontCameraIdRef.current ? { deviceId: { exact: frontCameraIdRef.current } } : { facingMode: "user" })
-      : (backCameraIdRef.current ? { deviceId: { exact: backCameraIdRef.current } } : { facingMode: "environment" });
-
     const qrConfig = {
       fps: 20,
       qrbox: (viewfinderWidth, viewfinderHeight) => {
         const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-        const edgeSize = Math.floor(minEdge * 0.82);
+        if (minEdge <= 60) {
+          return { width: minEdge, height: minEdge };
+        }
+        // Always strictly bounded between 65% and minEdge - 14px to guarantee it never exceeds viewfinder
+        const boxDim = Math.max(Math.floor(minEdge * 0.70), 50);
+        const safeDim = Math.min(boxDim, Math.max(minEdge - 14, 40));
         return {
-          width: Math.max(edgeSize, 200),
-          height: Math.max(edgeSize, 200),
+          width: safeDim,
+          height: safeDim,
         };
       },
-      aspectRatio: 1.0,
       disableFlip: choice === "back",
     };
 
-    try {
-      await scanner.start(
-        primaryConfig,
-        qrConfig,
-        (decodedText) => {
-          handleVerifyTicket(decodedText);
-          try {
-            scanner.stop();
-          } catch (e) {}
-        },
-        () => {}
-      );
-    } catch (err) {
-      console.error("Camera scanner start error with primary config:", err);
-      // Fallback: try direct facingMode string if deviceId exact match fails
+    const onScanSuccess = (decodedText) => {
+      handleVerifyTicket(decodedText);
       try {
-        const fallbackConfig = { facingMode: choice === "front" ? "user" : "environment" };
-        await scanner.start(
-          fallbackConfig,
-          qrConfig,
-          (decodedText) => {
-            handleVerifyTicket(decodedText);
-            try {
-              scanner.stop();
-            } catch (e) {}
-          },
-          () => {}
-        );
-      } catch (fallbackErr) {
-        console.error("Camera scanner fallback error:", fallbackErr);
-        let errMsg = "Could not activate camera. Please ensure permissions are granted.";
-        const errStr = String(fallbackErr).toLowerCase();
-        if (fallbackErr.name === "NotAllowedError" || errStr.includes("permission")) {
-          errMsg = "Camera permission was denied. Please allow camera permissions in your browser or switch to 'Upload QR Image'.";
-        } else if (fallbackErr.name === "NotFoundError" || errStr.includes("not found")) {
-          if (choice === "front") {
-            errMsg = "Front camera was not detected on this device. Please use the Back Camera.";
-            setHasFrontCamera(false);
-          } else {
-            errMsg = "Back camera was not detected on this device. You can try the Front Camera or 'Upload QR Image'.";
-            setHasBackCamera(false);
-          }
-        } else if (fallbackErr.name === "NotReadableError" || errStr.includes("in use")) {
-          errMsg = "Camera is currently in use by another app or browser tab. Please close other camera apps and retry.";
-        }
-        setCameraError(errMsg);
-      }
-    } finally {
-      setCameraLoading(false);
+        scanner.stop();
+      } catch (e) {}
+    };
+
+    // Ordered ladder of camera launch configurations:
+    // 1. Resolved specific hardware ID if known
+    // 2. Requested facingMode ({ facingMode: "environment" } or { facingMode: "user" })
+    // 3. Alternate facingMode (crucial for laptops where "environment" causes OverconstrainedError)
+    // 4. Any enumerated device ID
+    // 5. Permissive fallback / basic video stream
+    const attempts = [];
+
+    const specificId = choice === "front" ? frontCameraIdRef.current : backCameraIdRef.current;
+    if (specificId) {
+      attempts.push({ deviceId: { exact: specificId } });
     }
+
+    // Requested facing mode
+    attempts.push({ facingMode: choice === "front" ? "user" : "environment" });
+
+    // Alternate facing mode (allows laptops to instantly activate user webcam when environment fails)
+    attempts.push({ facingMode: choice === "front" ? "environment" : "user" });
+
+    // Try any enumerated cameras
+    try {
+      const devs = await Html5Qrcode.getCameras();
+      if (devs && devs.length > 0) {
+        devs.forEach((d) => {
+          if (d.id && !attempts.some((a) => a.deviceId?.exact === d.id)) {
+            attempts.push({ deviceId: { exact: d.id } });
+          }
+        });
+      }
+    } catch (e) {}
+
+    // Permissive constraints
+    attempts.push({ facingMode: { ideal: choice === "front" ? "user" : "environment" } });
+    attempts.push(true);
+
+    let started = false;
+    let lastError = null;
+
+    for (let i = 0; i < attempts.length; i++) {
+      const config = attempts[i];
+      try {
+        await scanner.start(config, qrConfig, onScanSuccess, () => {});
+        started = true;
+
+        // Apply iOS WebKit / Safari video playback attributes immediately
+        setTimeout(() => {
+          try {
+            const v = document.querySelector("#qr-reader-box video");
+            if (v) {
+              v.setAttribute("playsinline", "true");
+              v.setAttribute("webkit-playsinline", "true");
+              v.setAttribute("muted", "true");
+              v.muted = true;
+              v.play().catch(() => {});
+            }
+          } catch (e) {}
+        }, 50);
+
+        // If we succeeded using the opposite facing mode, update cameraChoice smoothly
+        if (config?.facingMode && config.facingMode !== (choice === "front" ? "user" : "environment")) {
+          setCameraChoice(config.facingMode === "user" ? "front" : "back");
+        }
+        break;
+      } catch (err) {
+        lastError = err;
+        console.warn(`Camera attempt ${i + 1}/${attempts.length} failed:`, config, err);
+      }
+    }
+
+    if (!started) {
+      console.error("All camera start attempts failed:", lastError);
+      let errMsg = "Could not activate camera. Please ensure camera permissions are granted.";
+      const errStr = String(lastError || "").toLowerCase();
+      if (lastError?.name === "NotAllowedError" || errStr.includes("permission") || errStr.includes("denied")) {
+        errMsg = "Camera permission was denied. Please allow camera permissions in your browser or switch to 'Upload QR Image'.";
+      } else if (lastError?.name === "NotFoundError" || errStr.includes("not found")) {
+        errMsg = "No camera was detected on this device. You can try 'Upload QR Image' or enter the code manually.";
+      } else if (lastError?.name === "NotReadableError" || errStr.includes("in use") || errStr.includes("could not start")) {
+        errMsg = "Camera is currently in use by another app or browser tab. Please close other camera apps and retry.";
+      }
+      setCameraError(errMsg);
+    }
+
+    setCameraLoading(false);
   };
 
   // Initialize or reconfigure camera scanner when modal opens in camera mode
@@ -290,18 +348,22 @@ export default function VolunteerDashboard() {
     if (scannerOpen && scannerMode === "camera" && !verifiedAttendee && !confirmedSuccess) {
       const startScanner = async () => {
         try {
-          if (!isMounted || !document.getElementById("qr-reader-box")) return;
+          if (!isMounted) return;
+
+          const box = document.getElementById("qr-reader-box");
+          if (!box) return;
 
           // Stop existing stream if any
           await stopActiveStream();
 
-          const scanner = new Html5Qrcode("qr-reader-box");
+          const scanner = new Html5Qrcode("qr-reader-box", {
+            formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+            verbose: false,
+          });
           html5QrCodeInstance.current = scanner;
 
           if (isMounted) {
-            // Default to Back camera for QR scanning on mobile & all devices
-            const initialChoice = cameraChoice || "back";
-            await startCameraStream(scanner, initialChoice);
+            await startCameraStream(scanner, cameraChoice);
           }
 
           // Asynchronously resolve logical cameras in background so switcher is ready
@@ -318,7 +380,7 @@ export default function VolunteerDashboard() {
         }
       };
 
-      const timer = setTimeout(startScanner, 20);
+      const timer = setTimeout(startScanner, 100);
       return () => {
         isMounted = false;
         clearTimeout(timer);
@@ -332,17 +394,6 @@ export default function VolunteerDashboard() {
   // Select camera choice directly: strictly "back" or "front"
   const handleSelectCamera = async (targetChoice) => {
     if (switchingCamera || cameraLoading) return;
-    if (targetChoice === "front" && !hasFrontCamera) {
-      toast.error("Front camera is not available on this device.");
-      return;
-    }
-    if (targetChoice === "back" && !hasBackCamera) {
-      toast.error("Back camera is not available on this device.");
-      return;
-    }
-    if (targetChoice === cameraChoice && !cameraError) {
-      return; // Already on this camera
-    }
 
     setSwitchingCamera(true);
     setCameraError(null);
@@ -353,7 +404,10 @@ export default function VolunteerDashboard() {
 
       let scanner = html5QrCodeInstance.current;
       if (!scanner) {
-        scanner = new Html5Qrcode("qr-reader-box");
+        scanner = new Html5Qrcode("qr-reader-box", {
+          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+          verbose: false,
+        });
         html5QrCodeInstance.current = scanner;
       }
 
@@ -406,7 +460,10 @@ export default function VolunteerDashboard() {
 
       let scanner = html5QrCodeInstance.current;
       if (!scanner) {
-        scanner = new Html5Qrcode("qr-reader-box");
+        scanner = new Html5Qrcode("qr-reader-box", {
+          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+          verbose: false,
+        });
         html5QrCodeInstance.current = scanner;
       }
 
@@ -1469,15 +1526,13 @@ export default function VolunteerDashboard() {
                             id="qr-reader-box"
                             style={{
                               width: "100%",
-                              height: "clamp(210px, 34vh, 270px)",
+                              minHeight: 220,
+                              maxHeight: "clamp(220px, 34vh, 270px)",
                               background: "#000",
                               borderRadius: 14,
                               overflow: "hidden",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              border: "1.5px solid rgba(139, 92, 246, 0.5)",
                               position: "relative",
+                              border: "1.5px solid rgba(139, 92, 246, 0.4)",
                             }}
                           />
                         </div>
@@ -1641,18 +1696,37 @@ export default function VolunteerDashboard() {
 
                 <style>{`
                   #qr-reader-box {
-                    border: none !important;
+                    width: 100% !important;
+                    min-height: 220px !important;
+                    max-height: clamp(220px, 34vh, 270px) !important;
+                    background: #000 !important;
+                    border-radius: 14px !important;
+                    overflow: hidden !important;
+                    position: relative !important;
                   }
                   #qr-reader-box video {
                     width: 100% !important;
                     height: 100% !important;
-                    max-height: clamp(210px, 34vh, 270px) !important;
+                    min-height: 220px !important;
+                    max-height: clamp(220px, 34vh, 270px) !important;
                     object-fit: cover !important;
                     border-radius: 14px !important;
+                    display: block !important;
+                    -webkit-transform: translateZ(0);
+                    transform: translateZ(0);
                   }
                   #qr-reader-box__scan_region {
-                    min-height: 190px !important;
+                    width: 100% !important;
+                    height: 100% !important;
+                    min-height: 220px !important;
+                    max-height: clamp(220px, 34vh, 270px) !important;
                     background: transparent !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                  }
+                  #qr-reader-box__scan_region video {
+                    object-fit: cover !important;
                   }
                   #qr-reader-box__dashboard_section,
                   #qr-reader-box__header_message {
