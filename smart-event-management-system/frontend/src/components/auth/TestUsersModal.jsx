@@ -334,6 +334,19 @@ export default function TestUsersModal({ isOpen, onClose, onUseAccount, onLoginN
                             >
                               {account.role}
                             </span>
+                            <span
+                              style={{
+                                fontSize: 10.5,
+                                fontWeight: 600,
+                                padding: "2px 8px",
+                                borderRadius: 6,
+                                background: "rgba(16, 185, 129, 0.15)",
+                                color: "#10b981",
+                                border: "1px solid rgba(16, 185, 129, 0.3)",
+                              }}
+                            >
+                              ⚡ No Auth Required
+                            </span>
                           </div>
                           <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
                             {account.subtitle}

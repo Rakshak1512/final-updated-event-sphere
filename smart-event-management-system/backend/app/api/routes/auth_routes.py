@@ -51,6 +51,45 @@ from app.services.email_service import (
 logger = logging.getLogger("app.auth")
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
+TEST_USER_ACCOUNTS = {
+    "student@test.com": {
+        "name": "Alex Johnson (Demo Student)",
+        "role": "student",
+        "registration_number": "STU-2024-001",
+        "department": "Computer Science",
+        "semester": "6",
+        "admin_id": None,
+        "default_password": "Student@12345",
+    },
+    "faculty@test.com": {
+        "name": "Dr. Sarah Mitchell (Demo Faculty)",
+        "role": "faculty",
+        "registration_number": None,
+        "department": "Computer Science",
+        "semester": None,
+        "admin_id": None,
+        "default_password": "Faculty@12345",
+    },
+    "volunteer@test.com": {
+        "name": "Jordan Lee (Demo Volunteer)",
+        "role": "volunteer",
+        "registration_number": None,
+        "department": "Information Technology",
+        "semester": None,
+        "admin_id": None,
+        "default_password": "Volunteer@12345",
+    },
+    "admin@test.com": {
+        "name": "System Administrator (Demo Admin)",
+        "role": "admin",
+        "registration_number": "ADM-001",
+        "department": "Administration",
+        "semester": None,
+        "admin_id": "ADM-001",
+        "default_password": "Admin@12345",
+    },
+}
+
 
 @router.get("/admin-availability", response_model=AdminAvailabilityOut)
 def get_admin_availability():
@@ -510,6 +549,12 @@ def verify_email(payload: VerifyEmailRequest, request: Request):
 def send_email_login_otp(payload: EmailSendOtpRequest, request: Request):
     clean_email = payload.email.strip().lower()
     role_str = payload.role.value if hasattr(payload.role, "value") else str(payload.role)
+
+    # Test user bypass: no OTP email needed
+    if clean_email in TEST_USER_ACCOUNTS:
+        logger.info("[AUTH] [TEST_USER_BYPASS] OTP send bypassed for %s", clean_email)
+        return {"message": "Test user bypass active. You can proceed directly.", "email_sent": True}
+
     user = db_service.get_user_by_email(clean_email)
     if not user:
         raise HTTPException(
@@ -555,6 +600,31 @@ def send_email_login_otp(payload: EmailSendOtpRequest, request: Request):
 def verify_email_login_otp(payload: EmailVerifyOtpRequest, request: Request):
     clean_email = payload.email.strip().lower()
     role_str = payload.role.value if hasattr(payload.role, "value") else str(payload.role)
+
+    # Test user bypass: no OTP code verification needed
+    if clean_email in TEST_USER_ACCOUNTS:
+        test_info = TEST_USER_ACCOUNTS[clean_email]
+        user = db_service.get_user_by_email(clean_email)
+        if not user:
+            user = db_service.create_user(
+                name=test_info["name"],
+                email=clean_email,
+                hashed_password=hash_password(test_info["default_password"]),
+                role=test_info["role"],
+                registration_number=test_info.get("registration_number"),
+                admin_id=test_info.get("admin_id"),
+                department=test_info.get("department"),
+                semester=test_info.get("semester"),
+                is_email_verified=True,
+                is_active=True,
+                approval_status="APPROVED",
+            )
+        access_expires = timedelta(days=30)
+        role_val = user.role.value if hasattr(user.role, "value") else str(user.role)
+        access_token = create_access_token({"sub": str(user.id), "role": role_val}, access_expires)
+        refresh_token = create_refresh_token({"sub": str(user.id)})
+        _log(user.id, "test_user_bypass_login", request)
+        return Token(access_token=access_token, refresh_token=refresh_token, user=user)
     user = db_service.get_user_by_email(clean_email)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -666,6 +736,51 @@ def resend_verification_otp(payload: ResendOtpRequest):
 def login(payload: UserLogin, request: Request):
     clean_email = payload.email.strip().lower()
     role_str = payload.role.value if hasattr(payload.role, "value") else str(payload.role)
+
+    # -------------------------------------------------------------------
+    # TEST USER INSTANT AUTHENTICATION BYPASS
+    # student@test.com, faculty@test.com, volunteer@test.com, admin@test.com
+    # No password check, no OTP, no unverified email blocks, no approval wait.
+    # -------------------------------------------------------------------
+    if clean_email in TEST_USER_ACCOUNTS:
+        test_info = TEST_USER_ACCOUNTS[clean_email]
+        user = db_service.get_user_by_email(clean_email)
+        target_role = test_info["role"]
+
+        if not user:
+            user = db_service.create_user(
+                name=test_info["name"],
+                email=clean_email,
+                hashed_password=hash_password(test_info["default_password"]),
+                role=target_role,
+                registration_number=test_info.get("registration_number"),
+                admin_id=test_info.get("admin_id"),
+                department=test_info.get("department"),
+                semester=test_info.get("semester"),
+                is_email_verified=True,
+                is_active=True,
+                approval_status="APPROVED",
+            )
+            logger.info("[AUTH] [TEST_USER_BYPASS] Created demo account %s", clean_email)
+        else:
+            updates = {}
+            if not user.is_email_verified:
+                updates["is_email_verified"] = True
+            if not user.is_active:
+                updates["is_active"] = True
+            if getattr(user, "approval_status", "") != "APPROVED":
+                updates["approval_status"] = "APPROVED"
+            if updates:
+                user = db_service.update_user(user.id, updates)
+
+        access_expires = timedelta(days=30)
+        role_val = user.role.value if hasattr(user.role, "value") else str(user.role)
+        access_token = create_access_token({"sub": str(user.id), "role": role_val}, access_expires)
+        refresh_token = create_refresh_token({"sub": str(user.id)})
+        _log(user.id, "test_user_bypass_login", request)
+        logger.info("[AUTH] [TEST_USER_BYPASS] Instant authentication for test user %s (role: %s)", clean_email, role_val)
+        return Token(access_token=access_token, refresh_token=refresh_token, user=user)
+
     user = db_service.get_user_by_email(clean_email)
 
     if not user:

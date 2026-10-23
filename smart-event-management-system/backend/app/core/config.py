@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: str = ""
     SMTP_USE_TLS: bool = True
 
+    # Feature Flags: Control email notifications for non-auth events
+    ENABLE_EMAIL_NOTIFICATIONS_FOR_OTHER_THINGS: bool = False
+
     @field_validator("EMAIL_PROVIDER", mode="before")
     @classmethod
     def clean_email_provider(cls, v: Any) -> str:

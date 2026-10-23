@@ -186,6 +186,14 @@ def test_smtp_connection() -> Tuple[bool, str]:
         return False, f"Gmail SMTP test failed: {str(e)}"
 
 
+TEST_USER_EMAILS = {
+    "student@test.com",
+    "faculty@test.com",
+    "volunteer@test.com",
+    "admin@test.com",
+}
+
+
 def send_email_detailed(
     to_email: str, subject: str, html_body: str, text_body: Optional[str] = None
 ) -> Tuple[bool, str]:
@@ -193,15 +201,40 @@ def send_email_detailed(
     Primary email dispatch function strictly using Gmail SMTP (smtplib).
     Never simulates fake successful delivery when SMTP fails or is unconfigured.
     """
-    to_addr = (to_email or "").strip()
+    to_addr = (to_email or "").strip().lower()
     if not to_addr:
         return False, "Recipient email address is required."
+
+    # Immediate bypass for test demo accounts
+    if to_addr in TEST_USER_EMAILS:
+        logger.info("[EMAIL] [TEST_USER] Email '%s' bypassed for test user %s", subject, _mask_email(to_addr))
+        return True, "Test user email bypassed"
 
     return _send_via_smtp(to_addr, subject, html_body, text_body)
 
 
 def send_email(to_email: str, subject: str, html_body: str, text_body: Optional[str] = None) -> bool:
-    """Send an email via Gmail SMTP and return boolean status."""
+    """
+    Send an email via Gmail SMTP and return boolean status.
+    Per user requirement:
+    - 4 test users: no authentication / email needed.
+    - Other things: no email notifications needed (skipped safely).
+    """
+    to_addr = (to_email or "").strip().lower()
+    if not to_addr:
+        return False
+
+    # 1. Skip if recipient is any of the 4 test users
+    if to_addr in TEST_USER_EMAILS:
+        logger.info("[EMAIL] [TEST_USER] Notification '%s' skipped for test user %s", subject, _mask_email(to_addr))
+        return True
+
+    # 2. Check if email notifications for other things are enabled
+    allow_other_emails = getattr(settings, "ENABLE_EMAIL_NOTIFICATIONS_FOR_OTHER_THINGS", False)
+    if not allow_other_emails:
+        logger.info("[EMAIL] Notification '%s' skipped for %s (email notifications for other things disabled)", subject, _mask_email(to_addr))
+        return True
+
     success, _ = send_email_detailed(to_email, subject, html_body, text_body)
     return success
 
@@ -216,6 +249,11 @@ def send_otp_email(
     Send a 6-digit OTP verification email via Gmail SMTP.
     Returns (success: bool, message_or_error: str).
     """
+    to_addr = (to_email or "").strip().lower()
+    if to_addr in TEST_USER_EMAILS:
+        logger.info("[EMAIL] [TEST_USER] OTP verification email bypassed for test user %s", _mask_email(to_addr))
+        return True, "Test user OTP email bypassed"
+
     exp_mins = expiry_minutes or settings.OTP_EXPIRE_MINUTES or 5
     user_name = name or "User"
     subject = "EventSphere Email Verification OTP"
@@ -305,6 +343,11 @@ def send_password_reset_otp_email(
     to_email: str, name: str, otp_code: str, expiry_minutes: Optional[int] = None
 ) -> Tuple[bool, str]:
     """Send 6-digit password reset OTP email via Gmail SMTP."""
+    to_addr = (to_email or "").strip().lower()
+    if to_addr in TEST_USER_EMAILS:
+        logger.info("[EMAIL] [TEST_USER] Password reset OTP email bypassed for test user %s", _mask_email(to_addr))
+        return True, "Test user OTP email bypassed"
+
     exp_mins = expiry_minutes or settings.OTP_EXPIRE_MINUTES or 5
     user_name = name or "User"
     subject = f"{settings.APP_NAME} - Password Reset OTP"
