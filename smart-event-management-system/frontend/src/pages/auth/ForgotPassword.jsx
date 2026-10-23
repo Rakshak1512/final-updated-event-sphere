@@ -56,8 +56,12 @@ export default function ForgotPassword() {
     setSubmitting(true);
     setErrorMessage("");
     try {
-      await authService.forgotPassword({ email: cleanEmail });
-      toast.success("Password reset OTP sent! Please check your email.");
+      const res = await authService.forgotPassword({ email: cleanEmail });
+      if (res?.data?.email_sent === false) {
+        toast.success("Password reset OTP generated! (Check server console if email is not received)", { duration: 6000 });
+      } else {
+        toast.success("Password reset OTP sent! Please check your email.");
+      }
       setStep("verify");
     } catch (err) {
       const detail = err.response?.data?.detail;
@@ -83,8 +87,12 @@ export default function ForgotPassword() {
     setErrorMessage("");
     setOtpError(false);
     try {
-      await authService.forgotPassword({ email: cleanEmail });
-      toast.success("A new 6-digit OTP has been sent to your email!");
+      const res = await authService.forgotPassword({ email: cleanEmail });
+      if (res?.data?.email_sent === false) {
+        toast.success("New 6-digit OTP generated! (Check server console if email is not received)", { duration: 6000 });
+      } else {
+        toast.success("A new 6-digit OTP has been sent to your email!");
+      }
       setOtp("");
     } catch (err) {
       const detail = err.response?.data?.detail;

@@ -94,12 +94,18 @@ export default function VerifyEmail() {
     setResending(true);
     setErrorMessage("");
     try {
+      let res;
       if (resendVerificationOtp) {
-        await resendVerificationOtp({ email: targetEmail });
+        res = await resendVerificationOtp({ email: targetEmail });
       } else {
-        await api.post("/auth/resend-verification-otp", { email: targetEmail });
+        const { data } = await api.post("/auth/resend-verification-otp", { email: targetEmail });
+        res = data;
       }
-      toast.success("A new 6-digit OTP has been sent to your email!");
+      if (res?.email_sent === false) {
+        toast.success("New 6-digit OTP generated! (Check server console if email is not received)", { duration: 6000 });
+      } else {
+        toast.success("A new 6-digit OTP has been sent to your email!");
+      }
       setOtp("");
     } catch (err) {
       const detail = err.response?.data?.detail;

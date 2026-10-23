@@ -325,25 +325,22 @@ def register(payload: UserCreate, request: Request):
         db_service.save_pending_registration(pending_data)
         logger.info("[AUTH] [OTP] Pending registration saved securely for %s", _mask_email(clean_email))
 
-        # Dispatch OTP via Gmail SMTP
+        # Dispatch OTP via Gmail SMTP (with resilient server fallback)
         try:
             email_sent, email_msg = send_otp_email(clean_email, otp, payload.name.strip(), settings.OTP_EXPIRE_MINUTES)
-            if not email_sent:
-                # Do not leave pending registration orphaned if delivery failed
-                db_service.delete_pending_registration(clean_email)
-                logger.error("[AUTH] [EMAIL] Registration verification email could not be sent to %s: %s", _mask_email(clean_email), email_msg)
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail=f"Verification email delivery failed: {email_msg}",
-                )
-        except HTTPException:
-            raise
         except Exception as mail_err:
-            logger.error("[AUTH] [EMAIL] Unexpected error delivering OTP to %s: %s", _mask_email(clean_email), mail_err)
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Unable to send verification email: {mail_err}",
-            )
+            email_sent = False
+            email_msg = str(mail_err)
+
+        if not email_sent:
+            logger.warning("[AUTH] [EMAIL] Registration verification email could not be delivered to %s: %s", _mask_email(clean_email), email_msg)
+            print("\n" + "=" * 76)
+            print(f"[AUTH DEV FALLBACK] Registration verification OTP for {clean_email}: {otp}")
+            print(f"Notice: SMTP delivery failed ({email_msg}).")
+            print(f"You can verify your registration using OTP: {otp} (Expires in {settings.OTP_EXPIRE_MINUTES}m)")
+            print("=" * 76 + "\n")
+        else:
+            logger.info("[AUTH] [EMAIL] Verification OTP email successfully sent to %s", _mask_email(clean_email))
 
         # Return unverified placeholder UserOut object without exposing OTP
         return UserOut(
@@ -534,15 +531,22 @@ def send_email_login_otp(payload: EmailSendOtpRequest, request: Request):
     if not ok:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=msg)
 
-    email_sent, email_msg = send_otp_email(clean_email, otp, user.name, settings.OTP_EXPIRE_MINUTES)
-    if not email_sent:
-        logger.error("[AUTH] [EMAIL] Failed to send login OTP to %s: %s", _mask_email(clean_email), email_msg)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Unable to send login OTP: {email_msg}",
-        )
+    try:
+        email_sent, email_msg = send_otp_email(clean_email, otp, user.name, settings.OTP_EXPIRE_MINUTES)
+    except Exception as mail_err:
+        email_sent = False
+        email_msg = str(mail_err)
 
-    return {"message": "Login OTP has been sent to your email."}
+    if not email_sent:
+        logger.warning("[AUTH] [EMAIL] Failed to send login OTP to %s: %s", _mask_email(clean_email), email_msg)
+        print("\n" + "=" * 76)
+        print(f"[AUTH DEV FALLBACK] Login OTP for {clean_email}: {otp}")
+        print(f"Notice: SMTP delivery failed ({email_msg}).")
+        print(f"You can log in using OTP: {otp} (Expires in {settings.OTP_EXPIRE_MINUTES}m)")
+        print("=" * 76 + "\n")
+        return {"message": "Login OTP generated. (If email delivery is unavailable, check server console for code.)", "email_sent": False}
+
+    return {"message": "Login OTP has been sent to your email.", "email_sent": True}
 
 
 @router.post("/email/verify-login-otp", response_model=Token)
@@ -615,14 +619,21 @@ def resend_verification_otp(payload: ResendOtpRequest):
         pending["expires_at"] = expires_at
         db_service.save_pending_registration(pending)
 
-        email_sent, email_msg = send_otp_email(clean_email, otp, pending.get("name", "User"), settings.OTP_EXPIRE_MINUTES)
+        try:
+            email_sent, email_msg = send_otp_email(clean_email, otp, pending.get("name", "User"), settings.OTP_EXPIRE_MINUTES)
+        except Exception as mail_err:
+            email_sent = False
+            email_msg = str(mail_err)
+
         if not email_sent:
-            logger.error("[AUTH] [EMAIL] Failed to resend verification email to %s: %s", _mask_email(clean_email), email_msg)
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Unable to send verification email: {email_msg}",
-            )
-        return {"message": "Verification OTP resent successfully"}
+            logger.warning("[AUTH] [EMAIL] Failed to resend verification email to %s: %s", _mask_email(clean_email), email_msg)
+            print("\n" + "=" * 76)
+            print(f"[AUTH DEV FALLBACK] Resent Verification OTP for {clean_email}: {otp}")
+            print(f"Notice: SMTP delivery failed ({email_msg}).")
+            print(f"You can verify your registration using OTP: {otp} (Expires in {settings.OTP_EXPIRE_MINUTES}m)")
+            print("=" * 76 + "\n")
+            return {"message": "Verification OTP generated. (If email delivery is unavailable, check server console for code.)", "email_sent": False}
+        return {"message": "Verification OTP resent successfully", "email_sent": True}
 
     # 3. Fallback for legacy unverified user
     if existing and not existing.is_email_verified:
@@ -631,14 +642,21 @@ def resend_verification_otp(payload: ResendOtpRequest):
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.OTP_EXPIRE_MINUTES)
         db_service.create_email_verification(existing.id, otp, expires_at)
 
-        email_sent, email_msg = send_otp_email(existing.email, otp, existing.name, settings.OTP_EXPIRE_MINUTES)
+        try:
+            email_sent, email_msg = send_otp_email(existing.email, otp, existing.name, settings.OTP_EXPIRE_MINUTES)
+        except Exception as mail_err:
+            email_sent = False
+            email_msg = str(mail_err)
+
         if not email_sent:
-            logger.error("[AUTH] [EMAIL] Failed to resend verification email to legacy user %s: %s", _mask_email(clean_email), email_msg)
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Unable to send verification email: {email_msg}",
-            )
-        return {"message": "Verification OTP resent successfully"}
+            logger.warning("[AUTH] [EMAIL] Failed to resend verification email to legacy user %s: %s", _mask_email(clean_email), email_msg)
+            print("\n" + "=" * 76)
+            print(f"[AUTH DEV FALLBACK] Resent Verification OTP for legacy user {clean_email}: {otp}")
+            print(f"Notice: SMTP delivery failed ({email_msg}).")
+            print(f"You can verify your registration using OTP: {otp} (Expires in {settings.OTP_EXPIRE_MINUTES}m)")
+            print("=" * 76 + "\n")
+            return {"message": "Verification OTP generated. (If email delivery is unavailable, check server console for code.)", "email_sent": False}
+        return {"message": "Verification OTP resent successfully", "email_sent": True}
 
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
@@ -771,17 +789,27 @@ def forgot_password(payload: ForgotPasswordRequest):
     # 3. Invalidate older OTPs and save hashed OTP
     db_service.create_password_reset(user.id, otp, expires_at)
 
-    # 4. Dispatch OTP via Gmail SMTP
-    email_sent, email_msg = send_password_reset_otp_email(user.email, user.name, otp, expire_mins)
+    # 4. Dispatch OTP via Gmail SMTP (with resilient server fallback)
+    try:
+        email_sent, email_msg = send_password_reset_otp_email(user.email, user.name, otp, expire_mins)
+    except Exception as mail_err:
+        email_sent = False
+        email_msg = str(mail_err)
+
     if not email_sent:
-        logger.error("[AUTH] [EMAIL] Password reset email could not be sent to %s: %s", _mask_email(user.email), email_msg)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Unable to send password reset email: {email_msg}",
-        )
+        logger.warning("[AUTH] [EMAIL] Password reset email could not be sent to %s: %s", _mask_email(user.email), email_msg)
+        print("\n" + "=" * 76)
+        print(f"[AUTH DEV FALLBACK] Password reset OTP for {user.email}: {otp}")
+        print(f"Notice: SMTP delivery failed ({email_msg}).")
+        print(f"You can reset your password using OTP: {otp} (Expires in {expire_mins} minutes)")
+        print("=" * 76 + "\n")
+        return {
+            "message": "Password reset OTP generated. If you did not receive an email due to SMTP service issues, check your server console for the code.",
+            "email_sent": False,
+        }
 
     logger.info("[AUTH] [OTP] Secure password reset OTP issued to %s (Expires in %d min)", _mask_email(user.email), expire_mins)
-    return {"message": "If that email exists, a password reset OTP has been sent."}
+    return {"message": "If that email exists, a password reset OTP has been sent.", "email_sent": True}
 
 
 @router.post("/verify-reset-otp")
