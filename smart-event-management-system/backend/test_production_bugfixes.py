@@ -307,6 +307,26 @@ class TestProductionBugFixes(unittest.TestCase):
         except Exception:
             pass
 
+    def test_10_volunteer_verify_ticket_with_hash_and_registered_status(self):
+        """Verifies ticket scanning handles # prefix and active 'registered' status."""
+        from app.models.user import User
+        vol = User(id=999, email="vol@test.edu", name="Test Volunteer", role=RoleEnum.volunteer)
+        
+        # Test with # prefix on the ticket from the user's issue
+        ok, msg, data = db_service.verify_ticket_for_volunteer(vol, "#BA6436533EF14244")
+        self.assertTrue(ok)
+        self.assertIsNotNone(data)
+        self.assertEqual(data["ticket_code"], "BA6436533EF14244")
+        self.assertEqual(data["status"], "registered")
+
+    def test_11_serve_uploaded_media_dynamic_qr_recovery(self):
+        """Verifies dynamic in-memory generation of missing QR images without 404 or network timeouts."""
+        resp = self.client.get("/api/uploads/qrcodes/f244ea8889e04a4e9db8b53cc203c345.png")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.headers.get("content-type"), "image/png")
+        self.assertGreaterEqual(len(resp.content), 200)
+
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -116,19 +116,35 @@ async def serve_uploaded_media(category: str, filename: str):
             logger.warning("Could not read local file %s: %s", local_path, e)
 
     if not file_bytes:
-        try:
-            from app.services.storage_service import download_from_firebase_storage
-
-            file_bytes = download_from_firebase_storage(rel_path)
-            if file_bytes:
+        if clean_cat == "qrcodes":
+            # Pure local in-memory QR generation — zero network latency, never hangs or 404s
+            try:
+                from app.utils.qr_utils import generate_qr_png_bytes
+                code_candidate = clean_fn.replace(".png", "").replace(".jpg", "").strip()
+                qr_payload = f"TICKET:{code_candidate}"
+                file_bytes = generate_qr_png_bytes(qr_payload)
                 try:
                     os.makedirs(os.path.dirname(local_path), exist_ok=True)
                     with open(local_path, "wb") as f:
                         f.write(file_bytes)
                 except Exception:
                     pass
-        except Exception:
-            pass
+            except Exception as e:
+                logger.warning("Local QR generation fallback failed: %s", e)
+        else:
+            try:
+                from app.services.storage_service import download_from_firebase_storage
+
+                file_bytes = download_from_firebase_storage(rel_path)
+                if file_bytes:
+                    try:
+                        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                        with open(local_path, "wb") as f:
+                            f.write(file_bytes)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
     if not file_bytes:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media file not found")

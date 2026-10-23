@@ -13,6 +13,7 @@ import PageTransition from "../../components/common/PageTransition.jsx";
 import { eventService, registrationService } from "../../api/services.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { fileUrl } from "../../utils/format.js";
+import QRCodeDisplay from "../../components/common/QRCodeDisplay.jsx";
 
 export default function EventsBrowse({ embedded = false }) {
   const { user } = useAuth();
@@ -187,17 +188,14 @@ export default function EventsBrowse({ embedded = false }) {
       <Modal open={!!qrModal} onClose={() => setQrModal(null)} title="Your Event Ticket" width={380}>
         {qrModal && (
           <div style={{ textAlign: "center" }}>
-            {qrModal.qr_code_path ? (
-              <div style={{ background: "#ffffff", padding: 16, borderRadius: 16, display: "inline-block", marginBottom: 16 }}>
-                <img
-                  src={fileUrl(qrModal.qr_code_path)}
-                  alt="QR Code Ticket"
-                  style={{ width: 220, height: 220, objectFit: "contain", display: "block" }}
-                />
-              </div>
-            ) : (
-              <div style={{ padding: 24, color: "var(--text-muted)" }}>Generating QR Code...</div>
-            )}
+            <div style={{ background: "#ffffff", padding: 12, borderRadius: 16, display: "inline-block", marginBottom: 16 }}>
+              <QRCodeDisplay
+                registration={qrModal}
+                ticketCode={qrModal.ticket_code}
+                size={200}
+                alt={`QR Ticket Pass - ${qrModal.ticket_code || qrModal.id}`}
+              />
+            </div>
             <h4 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{qrModal.event?.title || "Event Registration"}</h4>
             <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 12 }}>
               Ticket Code: <strong style={{ color: "#8b5cf6" }}>#{qrModal.ticket_code}</strong>

@@ -2922,8 +2922,22 @@ def verify_ticket_for_volunteer(
         return False, "Invalid registration QR code.", None
 
     target_ticket_code = raw_str
-    if "TICKET:" in raw_str:
-        parts = raw_str.split("|")
+    # Extract ticket code if scanned string is a URL (e.g. /ticket/{code} or /registrations/{id}/qr)
+    if "/ticket/" in raw_str:
+        try:
+            target_ticket_code = raw_str.split("/ticket/")[1].split("/")[0].split("?")[0].strip()
+        except Exception:
+            pass
+    elif "/registrations/" in raw_str and "/qr" in raw_str:
+        try:
+            candidate = raw_str.split("/registrations/")[1].split("/")[0].split("?")[0].strip()
+            if candidate.isdigit():
+                target_ticket_code = f"REG-{candidate}"
+        except Exception:
+            pass
+
+    if "TICKET:" in target_ticket_code:
+        parts = target_ticket_code.split("|")
         for p in parts:
             if p.startswith("TICKET:"):
                 target_ticket_code = p.replace("TICKET:", "").strip()
@@ -2933,6 +2947,9 @@ def verify_ticket_for_volunteer(
                 except Exception:
                     pass
 
+    # Normalize ticket code (strip leading # and whitespace, uppercase)
+    target_ticket_code = target_ticket_code.lstrip("#").strip().upper()
+
     db = get_firestore_db()
     # Query registration by ticket code
     matched_reg = None
@@ -2940,24 +2957,35 @@ def verify_ticket_for_volunteer(
     if reg_docs:
         matched_reg = reg_docs[0].to_dict()
 
-    if not matched_reg and target_ticket_code.startswith("REG-"):
-        try:
-            r_id = int(target_ticket_code.replace("REG-", ""))
-            doc = db.collection("registrations").document(str(r_id)).get()
+    if not matched_reg:
+        reg_docs = list(db.collection("registrations").where("ticket_code", "==", target_ticket_code.lower()).stream())
+        if reg_docs:
+            matched_reg = reg_docs[0].to_dict()
+
+    if not matched_reg:
+        numeric_id = None
+        if target_ticket_code.startswith("REG-"):
+            try:
+                numeric_id = int(target_ticket_code.replace("REG-", ""))
+            except Exception:
+                pass
+        elif target_ticket_code.isdigit():
+            numeric_id = int(target_ticket_code)
+
+        if numeric_id is not None:
+            doc = db.collection("registrations").document(str(numeric_id)).get()
             if doc.exists:
                 matched_reg = doc.to_dict()
-        except Exception:
-            pass
 
     if not matched_reg:
         return False, "Registration not found.", None
 
     reg_status = str(matched_reg.get("status", "")).strip().lower()
-    if reg_status == "cancelled":
+    if reg_status in ("cancelled", "rejected"):
         return False, "Registration is cancelled. Attendance cannot be recorded.", None
 
-    if reg_status in ("pending", "registered"):
-        return False, "Registration is pending faculty approval. Attendance cannot be recorded until approved.", None
+    if reg_status == "pending":
+        return False, "Registration is pending approval. Attendance cannot be recorded until approved.", None
 
     reg_event_id = int(matched_reg.get("event_id"))
     event = get_event_by_id(reg_event_id)
@@ -3021,11 +3049,11 @@ def confirm_attendance_atomic(
     reg_data = reg_doc.to_dict() or {}
     cur_status = str(reg_data.get("status", "")).strip().lower()
 
-    if cur_status == "cancelled":
+    if cur_status in ("cancelled", "rejected"):
         return False, "Registration is cancelled. Attendance cannot be recorded.", None, None, None
 
-    if cur_status in ("pending", "registered"):
-        return False, "Registration is pending faculty approval. Attendance cannot be recorded until approved.", None, None, None
+    if cur_status == "pending":
+        return False, "Registration is pending approval. Attendance cannot be recorded until approved.", None, None, None
 
     if cur_status in ("attended", "completed") or reg_data.get("checked_in_at"):
         return False, "Attendance already confirmed.", None, None, None
@@ -3046,10 +3074,10 @@ def confirm_attendance_atomic(
             return False, "Registration not found"
         curr = snap.to_dict() or {}
         c_st = str(curr.get("status", "")).strip().lower()
-        if c_st == "cancelled":
+        if c_st in ("cancelled", "rejected"):
             return False, "Registration is cancelled. Attendance cannot be recorded."
-        if c_st in ("pending", "registered"):
-            return False, "Registration is pending faculty approval."
+        if c_st == "pending":
+            return False, "Registration is pending approval."
         if c_st in ("attended", "completed") or curr.get("checked_in_at"):
             return False, "Attendance already confirmed."
 

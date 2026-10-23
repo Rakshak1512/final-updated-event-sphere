@@ -27,6 +27,7 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { useRealtime } from "../../context/RealtimeContext.jsx";
 import { fileUrl, formatDate } from "../../utils/format.js";
 import EventImage from "../../components/common/EventImage.jsx";
+import QRCodeDisplay from "../../components/common/QRCodeDisplay.jsx";
 
 export default function EventDetail({ embedded = false }) {
   const { id } = useParams();
@@ -523,17 +524,14 @@ export default function EventDetail({ embedded = false }) {
       <Modal open={!!qrModal} onClose={() => setQrModal(null)} title="Digital Event Pass" width={400}>
         {qrModal && (
           <div style={{ textAlign: "center" }}>
-            {qrModal.qr_code_path ? (
-              <div style={{ background: "#ffffff", padding: 16, borderRadius: 16, display: "inline-block", marginBottom: 16 }}>
-                <img
-                  src={fileUrl(qrModal.qr_code_path)}
-                  alt="QR Code Ticket"
-                  style={{ width: 220, height: 220, objectFit: "contain", display: "block" }}
-                />
-              </div>
-            ) : (
-              <div style={{ padding: 24, color: "var(--text-muted)" }}>Generating QR Code...</div>
-            )}
+            <div style={{ background: "#ffffff", padding: 12, borderRadius: 16, display: "inline-block", marginBottom: 16 }}>
+              <QRCodeDisplay
+                registration={qrModal}
+                ticketCode={qrModal.ticket_code}
+                size={200}
+                alt={`Digital Event Pass - ${qrModal.ticket_code || qrModal.id}`}
+              />
+            </div>
             <h4 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{event?.title}</h4>
             {qrModal.team_name && (
               <div className="badge badge-primary" style={{ marginBottom: 8 }}>

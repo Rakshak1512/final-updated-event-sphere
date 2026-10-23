@@ -76,6 +76,7 @@ export default function VolunteerDashboard() {
   const fileInputRef = useRef(null);
   const qrScannerRef = useRef(null);
   const html5QrCodeInstance = useRef(null);
+  const isScanningRef = useRef(false);
 
   const fetchDashboardData = async () => {
     try {
@@ -233,15 +234,15 @@ export default function VolunteerDashboard() {
     await stopActiveStream();
 
     const qrConfig = {
-      fps: 20,
+      fps: 25,
       qrbox: (viewfinderWidth, viewfinderHeight) => {
         const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
         if (minEdge <= 60) {
           return { width: minEdge, height: minEdge };
         }
-        // Always strictly bounded between 65% and minEdge - 14px to guarantee it never exceeds viewfinder
-        const boxDim = Math.max(Math.floor(minEdge * 0.70), 50);
-        const safeDim = Math.min(boxDim, Math.max(minEdge - 14, 40));
+        // Generous box (80% of min dimension) for effortless instant scanning from any distance or angle
+        const boxDim = Math.max(Math.floor(minEdge * 0.80), 50);
+        const safeDim = Math.min(boxDim, Math.max(minEdge - 10, 40));
         return {
           width: safeDim,
           height: safeDim,
@@ -251,6 +252,8 @@ export default function VolunteerDashboard() {
     };
 
     const onScanSuccess = (decodedText) => {
+      if (isScanningRef.current) return;
+      isScanningRef.current = true;
       handleVerifyTicket(decodedText);
       try {
         scanner.stop();
@@ -512,10 +515,25 @@ export default function VolunteerDashboard() {
   };
 
   const handleVerifyTicket = async (ticketPayload) => {
-    const code = (ticketPayload || manualCode).trim();
-    if (!code) {
+    let raw = (ticketPayload || manualCode || "").trim();
+    if (!raw) {
       toast.error("Please enter or scan a ticket code");
       return;
+    }
+
+    // Extract code if a full URL was scanned or pasted
+    if (raw.includes("/ticket/")) {
+      const match = raw.match(/\/ticket\/([^/?#]+)/);
+      if (match && match[1]) raw = match[1];
+    } else if (raw.includes("/registrations/") && raw.includes("/qr")) {
+      const match = raw.match(/\/registrations\/(\d+)\/qr/);
+      if (match && match[1]) raw = `REG-${match[1]}`;
+    }
+
+    // Strip leading hash (#) and normalize
+    let code = raw;
+    if (!raw.includes("TICKET:") && !raw.includes("|")) {
+      code = raw.replace(/^#+/, "").trim().toUpperCase();
     }
 
     try {
@@ -569,6 +587,7 @@ export default function VolunteerDashboard() {
   };
 
   const handleResetScanner = () => {
+    isScanningRef.current = false;
     setVerifiedAttendee(null);
     setVerifyError(null);
     setConfirmedSuccess(null);

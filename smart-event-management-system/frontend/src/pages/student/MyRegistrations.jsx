@@ -21,6 +21,7 @@ import Modal from "../../components/ui/Modal.jsx";
 import { SkeletonGrid } from "../../components/ui/Loader.jsx";
 import { registrationService, feedbackService } from "../../api/services.js";
 import { fileUrl, formatDate, statusBadgeClass } from "../../utils/format.js";
+import QRCodeDisplay from "../../components/common/QRCodeDisplay.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useRealtime } from "../../context/RealtimeContext.jsx";
 
@@ -549,7 +550,7 @@ export default function MyRegistrations() {
                 width: 220,
                 height: 220,
                 margin: "0 auto 16px",
-                padding: 12,
+                padding: 10,
                 borderRadius: 16,
                 background: "#ffffff",
                 boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
@@ -558,15 +559,11 @@ export default function MyRegistrations() {
                 justifyContent: "center",
               }}
             >
-              <img
-                src={getQrUrl(qrModal)}
-                alt="Event QR Ticket Pass"
-                onError={(e) => {
-                  if (qrModal.ticket_code && !e.target.src.includes("/ticket/")) {
-                    e.target.src = `/api/registrations/ticket/${qrModal.ticket_code}/qr`;
-                  }
-                }}
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+              <QRCodeDisplay
+                registration={qrModal}
+                ticketCode={qrModal.ticket_code}
+                size={200}
+                alt={`QR Ticket Pass - ${qrModal.ticket_code || qrModal.id}`}
               />
             </div>
 
