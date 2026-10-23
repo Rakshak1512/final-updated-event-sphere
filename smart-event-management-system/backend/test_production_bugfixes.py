@@ -326,6 +326,59 @@ class TestProductionBugFixes(unittest.TestCase):
         self.assertEqual(resp.headers.get("content-type"), "image/png")
         self.assertGreaterEqual(len(resp.content), 200)
 
+    @patch("app.api.routes.auth_routes.send_otp_email")
+    def test_12_account_not_added_to_database_until_email_verified(self, mock_send_email):
+        """Verifies account details are NOT inserted into the database until email verification is completed."""
+        mock_send_email.return_value = (True, "Delivered")
+        email = f"pending_verify_test_{self.timestamp}@college.edu"
+        password = "SecurePassword@123"
+        reg_no = f"REG_STAGED_{self.timestamp}"
+
+        payload = {
+            "name": "Staged User",
+            "email": email,
+            "password": password,
+            "confirm_password": password,
+            "role": "student",
+            "registration_number": reg_no,
+            "department": "Computer Science",
+            "semester": "4",
+        }
+
+        # Step 1: Submit create account / register
+        reg_resp = self.client.post("/api/auth/register", json=payload)
+        self.assertEqual(reg_resp.status_code, 201)
+
+        # Step 2: CRITICAL ASSERTION — User must NOT exist in the database (users collection) yet
+        user_in_db = db_service.get_user_by_email(email)
+        self.assertIsNone(user_in_db, "Account details must NOT be added to database before email verification!")
+
+        # Step 3: Login must be rejected because account is not in database
+        login_resp = self.client.post("/api/auth/login", json={"email": email, "password": password, "role": "student"})
+        self.assertEqual(login_resp.status_code, 403)
+
+        # Step 4: Extract OTP dispatched via secure email
+        mock_send_email.assert_called_once()
+        sent_otp = mock_send_email.call_args[0][1]
+
+        # Step 5: Verify email with OTP
+        verify_resp = self.client.post("/api/auth/verify-email", json={"email": email, "otp_code": sent_otp})
+        self.assertEqual(verify_resp.status_code, 200)
+
+        # Step 6: CRITICAL ASSERTION — Account must NOW be added to the database with is_email_verified=True
+        user_in_db_after = db_service.get_user_by_email(email)
+        self.assertIsNotNone(user_in_db_after, "Account details MUST be in database once email verification is completed!")
+        self.assertTrue(user_in_db_after.is_email_verified)
+        self.assertEqual(user_in_db_after.name, "Staged User")
+        self.assertEqual(user_in_db_after.registration_number, reg_no)
+
+        # Clean up
+        try:
+            db_service.delete_user(user_in_db_after.id)
+            db_service.delete_pending_registration(email)
+        except Exception:
+            pass
+
 
 if __name__ == "__main__":
     unittest.main()

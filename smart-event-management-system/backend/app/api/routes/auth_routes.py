@@ -86,6 +86,11 @@ def firebase_register(payload: FirebaseRegisterRequest, request: Request):
 
     clean_email = decoded["email"]
     token_verified = bool(decoded.get("email_verified"))
+    if not token_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email verification is required before your account details can be added to the database. Please verify your email first.",
+        )
     role_str = payload.role.value if hasattr(payload.role, "value") else str(payload.role)
 
     if payload.role == RoleEnum.student and not payload.registration_number:
@@ -663,8 +668,18 @@ def login(payload: UserLogin, request: Request):
     role_str = payload.role.value if hasattr(payload.role, "value") else str(payload.role)
     user = db_service.get_user_by_email(clean_email)
 
-    if not user or not verify_password(payload.password, user.hashed_password):
-        _log(user.id if user else None, "login_failed", request)
+    if not user:
+        pending = db_service.get_pending_registration(clean_email)
+        if pending:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your email has not been verified yet. Please complete verification with the OTP sent to your email before logging in.",
+            )
+        _log(None, "login_failed", request)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
+
+    if not verify_password(payload.password, user.hashed_password):
+        _log(user.id, "login_failed", request)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
 
     user_role_str = (user.role.value if hasattr(user.role, "value") else str(user.role)).lower().strip()
