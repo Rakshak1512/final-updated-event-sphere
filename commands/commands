@@ -1,0 +1,51 @@
+===================================================
+         EVENTSPHERE - ALL STARTUP COMMANDS
+===================================================
+
+[METHOD 1: RUN USING BAT FILES]
+Double-click these in Windows File Explorer or run in terminal:
+
+1. START EVERYTHING (Backend + Frontend in separate windows):
+   cd "c:\Users\raksh\project\final-updated-event-sphere-main\final-updated-event-sphere-main"
+   .\run_all.bat
+
+2. START ONLY BACKEND (FastAPI on http://127.0.0.1:8000):
+   cd "c:\Users\raksh\project\final-updated-event-sphere-main\final-updated-event-sphere-main"
+   .\run_backend.bat
+
+3. START ONLY FRONTEND (Vite React on http://localhost:5173):
+   cd "c:\Users\raksh\project\final-updated-event-sphere-main\final-updated-event-sphere-main"
+   .\run_frontend.bat
+
+4. STOP ALL SERVERS SAFELY (Frees ports 8000 and 5173):
+   cd "c:\Users\raksh\project\final-updated-event-sphere-main\final-updated-event-sphere-main"
+   .\stop_all.bat
+
+5. PUBLIC SHARE (Cloudflare Tunnel to share localhost:5173):
+   cd "c:\Users\raksh\project\final-updated-event-sphere-main\final-updated-event-sphere-main"
+   .\run_public_share.bat
+
+
+===================================================
+[METHOD 2: DIRECT MANUAL TERMINAL COMMANDS]
+
+TERMINAL 1 - BACKEND:
+cd "c:\Users\raksh\project\final-updated-event-sphere-main\final-updated-event-sphere-main\smart-event-management-system\backend"
+.\venv\Scripts\python.exe run_server.py
+
+TERMINAL 2 - FRONTEND:
+cd "c:\Users\raksh\project\final-updated-event-sphere-main\final-updated-event-sphere-main\smart-event-management-system\frontend"
+npm run dev
+
+TERMINAL 3 - CLOUDFLARE TUNNEL (OPTIONAL):
+"C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel --url http://localhost:5173
+
+
+===================================================
+[LOCAL ACCESS URLS]
+- Frontend:    http://localhost:5173
+- Backend:     http://127.0.0.1:8000
+- API Docs:    http://127.0.0.1:8000/docs
+- Health Check: http://127.0.0.1:8000/api/health
+- Email Check: http://127.0.0.1:8000/api/health/email?check_auth=true
+

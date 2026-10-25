@@ -20,6 +20,13 @@ export default function PublicNavbar({ activeSection = "home", onNavigateSection
 
   const isLandingPage = location.pathname === "/" || location.pathname === "";
 
+  const getDashboardUrl = (role) => {
+    if (role === "admin") return "/admin/dashboard";
+    if (role === "faculty") return "/faculty/dashboard";
+    if (role === "volunteer") return "/volunteer/dashboard";
+    return "/student/dashboard";
+  };
+
   const handleNavClick = (sectionId, e) => {
     e.preventDefault();
     setMobileOpen(false);
@@ -162,7 +169,7 @@ export default function PublicNavbar({ activeSection = "home", onNavigateSection
           <ThemeToggle />
           {user ? (
             <Link
-              to={user.role === "faculty" ? "/faculty/dashboard" : "/student/dashboard"}
+              to={getDashboardUrl(user.role)}
               className="btn btn-primary btn-sm"
               style={{ padding: "9px 20px" }}
             >
@@ -259,7 +266,7 @@ export default function PublicNavbar({ activeSection = "home", onNavigateSection
                 <ThemeToggle />
                 {user ? (
                   <Link
-                    to={user.role === "faculty" ? "/faculty/dashboard" : "/student/dashboard"}
+                    to={getDashboardUrl(user.role)}
                     className="btn btn-primary btn-sm"
                     onClick={() => setMobileOpen(false)}
                   >

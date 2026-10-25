@@ -70,7 +70,7 @@ export default function EventDetail({ embedded = false }) {
           registrationService
             .my()
             .then(({ data: myRegs }) => {
-              const found = myRegs.find((r) => r.event_id === Number(id) && r.status !== "cancelled");
+              const found = myRegs.find((r) => String(r.event_id) === String(id) && r.status !== "cancelled");
               if (found) setRegistration(found);
             })
             .catch(() => {});
@@ -90,7 +90,7 @@ export default function EventDetail({ embedded = false }) {
           registrationService
             .my()
             .then(({ data: myRegs }) => {
-              const found = myRegs.find((r) => r.event_id === Number(id) && r.status !== "cancelled");
+              const found = myRegs.find((r) => String(r.event_id) === String(id) && r.status !== "cancelled");
               if (found) {
                 setRegistration(found);
                 if (found.team_id) {
@@ -210,7 +210,7 @@ export default function EventDetail({ embedded = false }) {
 
       // Refresh registration status
       const { data: myRegs } = await registrationService.my();
-      const found = myRegs.find((r) => r.event_id === Number(id) && r.status !== "cancelled");
+      const found = myRegs.find((r) => String(r.event_id) === String(id) && r.status !== "cancelled");
       if (found) {
         setRegistration(found);
         setQrModal(found);
