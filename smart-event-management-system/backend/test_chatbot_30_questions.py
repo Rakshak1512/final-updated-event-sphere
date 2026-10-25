@@ -222,6 +222,29 @@ class TestChatbot30Questions(unittest.TestCase):
         self.assertIn("Security Notice", reply)
         self.assertIn("cannot disclose", reply.lower())
 
+    # --- CATEGORY 14: Unauthenticated & Pending Approval Users ---
+    def test_q33_guest_unauthenticated_user(self):
+        reply = self._ask(None, "What events are available?")
+        self.assertTrue(len(reply) > 20)
+        self.assertNotIn("temporary issue", reply.lower())
+
+    def test_q34_guest_greeting(self):
+        reply = self._ask(None, "Hello")
+        self.assertIn("Hello there!", reply)
+        self.assertNotIn("temporary issue", reply.lower())
+
+    def test_q35_pending_approval_student(self):
+        pending_student = User(
+            id=1002,
+            name="Aman Verma",
+            email="aman@college.edu",
+            role=RoleEnum.student,
+            registration_number="21CS1099",
+            approval_status="PENDING",
+        )
+        reply = self._ask(pending_student, "How does account approval work?")
+        self.assertIn("Awaiting Faculty Approval", reply)
+
 
 if __name__ == "__main__":
     unittest.main()

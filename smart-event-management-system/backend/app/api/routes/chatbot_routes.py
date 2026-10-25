@@ -2,7 +2,7 @@ from typing import List, Optional, Dict
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, status
 
-from app.dependencies import get_current_approved_user
+from app.dependencies import get_current_user_optional
 from app.models.user import User
 from app.services.chatbot_service import get_chatbot_response
 
@@ -27,7 +27,7 @@ class ChatResponse(BaseModel):
 @router.post("/ask", response_model=ChatResponse)
 def ask_chatbot(
     payload: ChatRequest,
-    current_user: User = Depends(get_current_approved_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     history_dicts = [{"role": m.role, "content": m.content} for m in payload.history] if payload.history else []
     result = get_chatbot_response(current_user, payload.message, history_dicts)

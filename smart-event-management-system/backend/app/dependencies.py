@@ -1,6 +1,8 @@
 """
 Reusable FastAPI dependencies: current user extraction, role guards.
 """
+from typing import Optional
+
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 
@@ -9,6 +11,22 @@ from app.db.firestore_service import get_user_by_id
 from app.models.user import RoleEnum, User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
+
+
+def get_current_user_optional(token: str = Depends(oauth2_scheme)) -> Optional[User]:
+    if not token:
+        return None
+    try:
+        payload = decode_token(token)
+        if not payload or payload.get("type") != "access":
+            return None
+        user_id = payload.get("sub")
+        if user_id is None:
+            return None
+        resolved_id = int(user_id) if str(user_id).isdigit() else str(user_id)
+        return get_user_by_id(resolved_id)
+    except Exception:
+        return None
 
 
 def get_current_user(token: str = Depends(oauth2_scheme)) -> User:

@@ -62,12 +62,12 @@ def _resolve_contextual_event(message: str, history: Optional[List[Dict[str, str
     return None
 
 
-def _build_grounded_system_context(user: User, all_events: list, role: str) -> str:
+def _build_grounded_system_context(user: Optional[User], all_events: list, role: str) -> str:
     """Build authoritative, real-time database context to ground the AI response."""
-    user_name = user.name or "User"
-    user_email = user.email or "N/A"
-    reg_no = user.registration_number or user.admin_id or "N/A"
-    dept = user.department or "General"
+    user_name = getattr(user, "name", None) or "Guest / Student"
+    user_email = getattr(user, "email", None) or "N/A"
+    reg_no = getattr(user, "registration_number", None) or getattr(user, "admin_id", None) or "N/A"
+    dept = getattr(user, "department", None) or "General"
     status = getattr(user, "approval_status", "ACTIVE") or "ACTIVE"
 
     # Format events catalog summary
@@ -80,7 +80,7 @@ def _build_grounded_system_context(user: User, all_events: list, role: str) -> s
 
     # Role specific data
     role_data = ""
-    if role == "student":
+    if role == "student" and user:
         try:
             regs = db_service.get_my_registrations(user.id)
             if regs:
@@ -99,7 +99,7 @@ def _build_grounded_system_context(user: User, all_events: list, role: str) -> s
         except Exception as e:
             logger.debug("Error building student chatbot context: %s", e)
 
-    elif role == "faculty":
+    elif role == "faculty" and user:
         try:
             tasks = db_service.get_faculty_assignments(user.id)
             if tasks:
@@ -111,7 +111,7 @@ def _build_grounded_system_context(user: User, all_events: list, role: str) -> s
         except Exception as e:
             logger.debug("Error building faculty chatbot context: %s", e)
 
-    elif role == "volunteer":
+    elif role == "volunteer" and user:
         try:
             dash = db_service.get_volunteer_dashboard_data(user)
             role_data += f"VOLUNTEER STATS: Total Scanned: {dash.get('total_scanned', 0)}, Today Scanned: {dash.get('today_scanned', 0)}.\n"
@@ -259,7 +259,7 @@ def _call_openai_api(api_key: str, model: str, system_prompt: str, message: str,
     return _parse_ai_reply_and_suggestions(reply_text)
 
 
-def _database_grounded_fallback(user: User, message: str, history: Optional[List[Dict[str, str]]], all_events: list, role: str) -> Dict[str, Any]:
+def _database_grounded_fallback(user: Optional[User], message: str, history: Optional[List[Dict[str, str]]], all_events: list, role: str) -> Dict[str, Any]:
     """
     Authoritative database-grounded query handler when external AI provider
     is unconfigured, rate-limited, or unavailable.
@@ -270,7 +270,7 @@ def _database_grounded_fallback(user: User, message: str, history: Optional[List
 
     # 1. Cross-Role Institutional Approvals
     if has_any(["how does approval work", "approval process", "account approval", "pending approval", "faculty approval", "admin approval"]):
-        appr_status = getattr(user, "approval_status", "ACTIVE") or "ACTIVE"
+        appr_status = (getattr(user, "approval_status", "ACTIVE") if user else "ACTIVE") or "ACTIVE"
         if role == "student":
             st_desc = "Your student account is currently **ACTIVE** and fully approved." if appr_status == "ACTIVE" else "Your account is **Awaiting Faculty Approval**."
             return {
@@ -375,8 +375,8 @@ def _database_grounded_fallback(user: User, message: str, history: Optional[List
 
     # 8. STUDENT INTENTS
     if role == "student":
-        my_regs = db_service.get_my_registrations(user.id)
-        user_reg_no = (user.registration_number or "").strip()
+        my_regs = db_service.get_my_registrations(user.id) if user and hasattr(user, "id") and user.id else []
+        user_reg_no = ((user.registration_number or "") if user and hasattr(user, "registration_number") else "").strip()
 
         if is_how_reg:
             return {
@@ -508,15 +508,16 @@ def _database_grounded_fallback(user: User, message: str, history: Optional[List
             }
 
         if re.search(r"\b(?:hi|hey|hello|who are you|good morning|good evening)\b", clean_msg) and not (is_venue_query or is_time_query or is_reg_query or is_seat_query or is_att_query or is_cert_query or is_result_query):
+            user_name = (getattr(user, "name", None) if user else None) or "there"
             return {
-                "reply": f"Hello {user.name}! I am **EventSphere AI**. You can ask me about available events, your registered events, attendance check-ins, seats remaining, or downloading certificates.",
+                "reply": f"Hello {user_name}! I am **EventSphere AI**. You can ask me about available events, your registered events, attendance check-ins, seats remaining, or downloading certificates.",
                 "suggestions": ["What events am I registered for?", "Show my certificates", "What events are available?", "Did I attend the event?"],
             }
 
     # 9. FACULTY INTENTS
     elif role == "faculty":
         if is_task_query:
-            tasks = db_service.get_faculty_assignments(user.id)
+            tasks = db_service.get_faculty_assignments(user.id) if user and hasattr(user, "id") and user.id else []
             if not tasks:
                 return {
                     "reply": "You currently have no pending tasks assigned by the administration. All your event coordination duties are up to date!",
@@ -573,21 +574,23 @@ def _database_grounded_fallback(user: User, message: str, history: Optional[List
                     "suggestions": [f"Who registered for {ctx_event.title}?", f"Who attended {ctx_event.title}?"],
                 }
 
+        faculty_name = (getattr(user, "name", None) if user else None) or "Faculty"
         return {
-            "reply": f"Hello Prof. {user.name}! I am **EventSphere AI**. Ask me about event registrations, attendee rosters, declared winners, or assigned administrative tasks.",
+            "reply": f"Hello Prof. {faculty_name}! I am **EventSphere AI**. Ask me about event registrations, attendee rosters, declared winners, or assigned administrative tasks.",
             "suggestions": ["How many students registered?", "Who attended?", "What work is assigned to me?"],
         }
 
     # 10. VOLUNTEER INTENTS
     elif role == "volunteer":
-        dash_data = db_service.get_volunteer_dashboard_data(user)
+        dash_data = db_service.get_volunteer_dashboard_data(user) if user else {}
         if has_any(["how do i scan", "how to scan", "scanner", "scan qr"]):
             return {
                 "reply": "📷 **How to Scan Tickets as Volunteer:**\n\n1. Open your **Volunteer Dashboard**.\n2. Click **[Scan Registration QR]**.\n3. Point your device camera at the student's digital QR pass.\n4. Click **'Confirm Attendance'** to verify check-in in real time.",
                 "suggestions": ["Show my assigned events", "How many attendees scanned?"],
             }
+        vol_name = (getattr(user, "name", None) if user else None) or "Volunteer"
         return {
-            "reply": f"Hello Volunteer {user.name}! I am **EventSphere AI**. Ask me about scanning student passes, assigned event venues, or verified check-in counts.",
+            "reply": f"Hello Volunteer {vol_name}! I am **EventSphere AI**. Ask me about scanning student passes, assigned event venues, or verified check-in counts.",
             "suggestions": ["How do I scan QR?", "Show my assigned events", "How many attendees scanned?"],
         }
 
@@ -600,8 +603,9 @@ def _database_grounded_fallback(user: User, message: str, history: Optional[List
                 "reply": f"🎪 **Active Events ({len(all_events)} Total):**\n\n• **Total Capacity:** {total_seats} Seats\n• **Seats Remaining:** {total_avail}",
                 "suggestions": ["Show faculty", "What work is assigned?", "Show reports"],
             }
+        admin_name = (getattr(user, "name", None) if user else None) or "Administrator"
         return {
-            "reply": f"Hello Administrator {user.name}! I am **EventSphere AI**. Ask me about faculty directory, active work assignments, campus event capacity, or generating administrative reports.",
+            "reply": f"Hello Administrator {admin_name}! I am **EventSphere AI**. Ask me about faculty directory, active work assignments, campus event capacity, or generating administrative reports.",
             "suggestions": ["How many faculty are there?", "What work is assigned?", "How many events are active?", "Show reports"],
         }
 
@@ -636,7 +640,7 @@ def _database_grounded_fallback(user: User, message: str, history: Optional[List
     }
 
 
-def get_chatbot_response(user: User, message: str, history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
+def get_chatbot_response(user: Optional[User], message: str, history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
     """
     Unified EventSphere AI Assistant.
     1. Enforces strict security constraints & prompt injection guards.
@@ -647,7 +651,7 @@ def get_chatbot_response(user: User, message: str, history: Optional[List[Dict[s
     """
     try:
         clean_msg = (message or "").strip().lower()
-        role = user.role.value if hasattr(user.role, "value") else str(user.role).lower()
+        role = (user.role.value if hasattr(user.role, "value") else str(user.role).lower()) if user and hasattr(user, "role") and user.role else "student"
 
         # Security Guardrail: Prompt Injection & Sensitive Data Protection
         sensitive_patterns = [
