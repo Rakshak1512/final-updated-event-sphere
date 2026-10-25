@@ -10,6 +10,7 @@ Supports:
 
 import logging
 import os
+os.environ.setdefault("GRPC_POLL_STRATEGY", "poll")
 from typing import Optional
 
 import firebase_admin

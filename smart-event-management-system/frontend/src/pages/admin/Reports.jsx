@@ -541,6 +541,30 @@ export default function AdminReports() {
     }
   };
 
+  // Quick Direct CSV / Excel Download Helper
+  const handleQuickDownloadCSV = async (reportKey, fetchFn, defaultTitle) => {
+    setDownloading((prev) => ({ ...prev, [`${reportKey}_csv`]: true }));
+    try {
+      const data = await fetchFn({
+        selectedColumns: (reportCards.find((r) => r.key === reportKey)?.availableColumns || []).map((c) => c.key),
+        selectedEventId: "all",
+        statusFilter: "all",
+        sortBy: "",
+        sortOrder: "asc",
+        includeSummary: true,
+      });
+
+      const safeFilename = `EventSphere_${defaultTitle.replace(/[^a-zA-Z0-9_-]/g, "_")}_${new Date().toISOString().split("T")[0]}.csv`;
+      exportToCSV(safeFilename, data.headers || [], data.rows || []);
+      toast.success(`${defaultTitle} downloaded as CSV / Excel!`);
+    } catch (err) {
+      console.error("Quick CSV export error:", err);
+      toast.error("Failed to generate CSV / Excel report.");
+    } finally {
+      setDownloading((prev) => ({ ...prev, [`${reportKey}_csv`]: false }));
+    }
+  };
+
   const reportCards = [
     {
       key: "faculty",
@@ -666,14 +690,13 @@ export default function AdminReports() {
               {rc.desc}
             </p>
 
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {/* Primary Action: Configure & Preview PDF */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              {/* Primary Action: Configure & Preview */}
               <button
                 type="button"
                 className="btn btn-primary btn-sm"
                 style={{
-                  flex: 1,
-                  minWidth: 140,
+                  flex: "1 1 120px",
                   justifyContent: "center",
                   gap: 6,
                   fontWeight: 700,
@@ -681,25 +704,47 @@ export default function AdminReports() {
                 }}
                 onClick={() => setActiveConfigReport(rc)}
               >
-                <FiSliders size={14} /> Configure & Download PDF
+                <FiSliders size={14} /> Configure
               </button>
 
-              {/* Secondary Action: Quick Direct Download */}
+              {/* Quick Direct PDF Download */}
               <button
                 type="button"
                 className="btn btn-outline btn-sm"
                 style={{
-                  padding: "0 12px",
+                  padding: "0 10px",
                   borderRadius: 10,
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center",
+                  gap: 5,
+                  fontWeight: 600,
+                  fontSize: 12,
                 }}
-                title="Quick Download Standard PDF Report"
+                title="Quick Download Standard PDF Document"
                 disabled={downloading[rc.key]}
                 onClick={() => handleQuickDownload(rc.key, rc.fetchDataFn, rc.defaultTitle, rc.defaultSubtitle)}
               >
-                <FiDownload size={14} />
+                <FiFileText size={13} /> PDF
+              </button>
+
+              {/* Quick Direct CSV Download */}
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                style={{
+                  padding: "0 10px",
+                  borderRadius: 10,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  fontWeight: 600,
+                  fontSize: 12,
+                }}
+                title="Quick Download CSV / Excel Spreadsheet"
+                disabled={downloading[`${rc.key}_csv`]}
+                onClick={() => handleQuickDownloadCSV(rc.key, rc.fetchDataFn, rc.defaultTitle)}
+              >
+                <FiDownload size={13} /> CSV
               </button>
             </div>
           </motion.div>

@@ -202,35 +202,6 @@ export default function Register() {
           />
         </div>
 
-        {/* Top Navigation Controls */}
-        <div style={{ position: "absolute", top: "max(20px, calc(env(safe-area-inset-top, 0px) + 16px))", left: "max(20px, calc(env(safe-area-inset-left, 0px) + 16px))", zIndex: 10 }}>
-          <button
-            type="button"
-            onClick={() => {
-              if (window.history.length > 1) navigate(-1);
-              else navigate("/", { replace: true });
-            }}
-            aria-label="Go back"
-            title="Go back"
-            style={{
-              width: 42,
-              height: 42,
-              minWidth: 42,
-              minHeight: 42,
-              borderRadius: 12,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "var(--bg-glass)",
-              border: "1px solid var(--border-color)",
-              color: "var(--text-secondary)",
-              cursor: "pointer",
-            }}
-          >
-            <FiArrowLeft size={18} />
-          </button>
-        </div>
-
         <div style={{ position: "absolute", top: "max(20px, calc(env(safe-area-inset-top, 0px) + 16px))", right: "max(20px, calc(env(safe-area-inset-right, 0px) + 16px))", zIndex: 10 }}>
           <ThemeToggle />
         </div>
@@ -252,6 +223,37 @@ export default function Register() {
             zIndex: 2,
           }}
         >
+          {/* Back button aligned inside card */}
+          <button
+            type="button"
+            onClick={() => {
+              if (window.history.length > 1) navigate(-1);
+              else navigate("/", { replace: true });
+            }}
+            aria-label="Go back"
+            title="Go back"
+            style={{
+              position: "absolute",
+              top: 18,
+              left: 18,
+              width: 40,
+              height: 40,
+              minWidth: 42,
+              minHeight: 42,
+              borderRadius: 12,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "var(--bg-glass)",
+              border: "1px solid var(--border-color)",
+              color: "var(--text-secondary)",
+              cursor: "pointer",
+              zIndex: 3,
+            }}
+          >
+            <FiArrowLeft size={18} />
+          </button>
+
           <div style={{ textAlign: "center", marginBottom: 24 }}>
             <Link
               to="/"
@@ -403,7 +405,7 @@ export default function Register() {
             {/* Student Specific Fields */}
             {form.role === "student" && (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div className="form-grid-2">
                   <div className="form-group">
                     <label className="form-label">Registration Number</label>
                     <input
@@ -472,7 +474,7 @@ export default function Register() {
               {errors.email && <span className="form-error">{errors.email}</span>}
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div className="form-grid-2">
               <div className="form-group">
                 <label className="form-label">Password</label>
                 <div style={{ position: "relative" }}>

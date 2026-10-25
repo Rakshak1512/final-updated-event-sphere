@@ -525,19 +525,11 @@ def verify_email(payload: VerifyEmailRequest, request: Request):
     if user.is_email_verified:
         return user
 
-    verification = db_service.get_latest_email_verification(user.id, otp_input)
-    if not verification:
-        logger.warning("OTP verification failed (invalid OTP) for %s", _mask_email(clean_email))
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OTP. Please try again.")
+    ok, msg, verification = db_service.verify_email_verification_otp(user.id, otp_input)
+    if not ok:
+        logger.warning("OTP verification failed (%s) for %s", msg, _mask_email(clean_email))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
 
-    exp = verification.expires_at
-    if exp.tzinfo is None:
-        exp = exp.replace(tzinfo=timezone.utc)
-    if exp < datetime.now(timezone.utc):
-        logger.warning("OTP verification failed (expired OTP) for %s", _mask_email(clean_email))
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This OTP has expired. Please request a new OTP.")
-
-    db_service.mark_email_verification_used(verification.id)
     updated_user = db_service.update_user(user.id, {"is_email_verified": True})
     logger.info("OTP verification successful for %s", _mask_email(clean_email))
     _log(user.id, "verify_email", request)

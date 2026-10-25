@@ -54,21 +54,45 @@ def decode_token(token: str) -> Optional[dict]:
 
 
 def generate_otp(length: int = None) -> str:
-    """Generate a cryptographically secure 6-digit numeric OTP."""
-    target_len = length or settings.OTP_LENGTH or 6
+    """Generate a cryptographically secure 6-digit numeric OTP using secrets."""
+    target_len = length or getattr(settings, "OTP_LENGTH", 6) or 6
     return "".join(secrets.choice(string.digits) for _ in range(target_len))
 
 
 def hash_otp(otp_code: str) -> str:
-    """Create a secure HMAC-SHA256 digest of the OTP code."""
+    """
+    Hash OTP code using bcrypt with a unique salt per generation.
+    Never store plaintext OTPs anywhere.
+    """
     clean_otp = str(otp_code).strip()
-    key = (settings.SECRET_KEY or "eventsphere-otp-secret").encode("utf-8")
-    return hmac.new(key, clean_otp.encode("utf-8"), hashlib.sha256).hexdigest()
+    return pwd_context.hash(clean_otp)
 
 
 def verify_otp_hash(plain_otp: str, hashed_otp: str) -> bool:
-    """Compare plain OTP against hashed OTP using constant-time comparison."""
+    """
+    Verify submitted plain OTP against stored bcrypt hash using constant-time comparison.
+    Includes backward-compatible fallback for legacy HMAC-SHA256 hashes during migration.
+    """
     if not plain_otp or not hashed_otp:
         return False
-    computed = hash_otp(plain_otp)
-    return hmac.compare_digest(computed, str(hashed_otp).strip())
+    clean_otp = str(plain_otp).strip()
+    hash_str = str(hashed_otp).strip()
+
+    # 1. Bcrypt hash check ($2b$, $2a$, $2y$)
+    if hash_str.startswith(("$2b$", "$2a$", "$2y$")):
+        try:
+            return pwd_context.verify(clean_otp, hash_str)
+        except Exception:
+            return False
+
+    # 2. Legacy HMAC-SHA256 fallback (during migration period)
+    try:
+        key = (getattr(settings, "SECRET_KEY", None) or "eventsphere-otp-secret").encode("utf-8")
+        computed = hmac.new(key, clean_otp.encode("utf-8"), hashlib.sha256).hexdigest()
+        if hmac.compare_digest(computed, hash_str):
+            return True
+    except Exception:
+        pass
+
+    return False
+

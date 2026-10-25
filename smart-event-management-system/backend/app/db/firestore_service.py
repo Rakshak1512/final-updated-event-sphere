@@ -8,7 +8,7 @@ from google.cloud.firestore import Transaction, transactional
 
 from app.core.config import settings
 from app.core.firebase import get_firestore_db, get_next_id
-from app.core.security import hash_otp
+from app.core.security import hash_otp, verify_otp_hash
 from app.models.assignment import FacultyAssignment, TaskPriority, TaskStatus
 from app.models.audit_log import AuditLog
 from app.models.auth_tokens import EmailVerification, PasswordReset
@@ -1993,12 +1993,37 @@ def delete_pending_registration(email: str):
 
 
 def create_email_verification(user_id: int, otp_code: str, expires_at: datetime) -> EmailVerification:
+    """Create a new email verification record with bcrypt-hashed OTP, invalidating previous unused OTPs."""
     db = get_firestore_db()
+    # 1. Invalidate any previous unused email verifications for this user
+    try:
+        prev_docs = (
+            db.collection("email_verifications")
+            .where("user_id", "==", int(user_id))
+            .where("is_used", "==", False)
+            .stream()
+        )
+        batch = db.batch()
+        count = 0
+        for doc in prev_docs:
+            batch.update(doc.reference, {"is_used": True})
+            count += 1
+        if count > 0:
+            batch.commit()
+    except Exception as e:
+        logger.warning("Could not invalidate previous email verifications for user %s: %s", user_id, e)
+
     ev_id = get_next_id("email_verifications")
+    hashed_val = hash_otp(otp_code)
+    max_att = getattr(settings, "OTP_MAX_ATTEMPTS", 5) or 5
+
     ev = EmailVerification(
         id=ev_id,
-        user_id=user_id,
-        otp_code=otp_code,
+        user_id=int(user_id),
+        otp_code="",  # Plaintext OTP is NEVER stored
+        hashed_otp=hashed_val,
+        attempts=0,
+        max_attempts=max_att,
         expires_at=expires_at,
         is_used=False,
         created_at=datetime.now(timezone.utc),
@@ -2007,12 +2032,12 @@ def create_email_verification(user_id: int, otp_code: str, expires_at: datetime)
     return ev
 
 
-def get_latest_email_verification(user_id: int, otp_code: str) -> Optional[EmailVerification]:
+def get_latest_email_verification(user_id: int, otp_code: str = "") -> Optional[EmailVerification]:
+    """Retrieve the latest unused email verification record for a user."""
     db = get_firestore_db()
     docs = (
         db.collection("email_verifications")
         .where("user_id", "==", int(user_id))
-        .where("otp_code", "==", str(otp_code).strip())
         .where("is_used", "==", False)
         .stream()
     )
@@ -2021,6 +2046,42 @@ def get_latest_email_verification(user_id: int, otp_code: str) -> Optional[Email
         return None
     verifications.sort(key=lambda v: v.created_at, reverse=True)
     return verifications[0]
+
+
+def verify_email_verification_otp(user_id: int, plain_otp: str) -> Tuple[bool, str, Optional[EmailVerification]]:
+    """Verify submitted OTP against stored bcrypt hash, tracking attempt limits and expiration."""
+    db = get_firestore_db()
+    verification = get_latest_email_verification(user_id)
+    if not verification:
+        return False, "This verification code has expired. Please request a new OTP.", None
+
+    rec_id = verification.id
+    # Check expiration
+    exp = verification.expires_at
+    if isinstance(exp, datetime):
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if exp < datetime.now(timezone.utc):
+            mark_email_verification_used(rec_id)
+            return False, "This verification code has expired. Please request a new OTP.", None
+
+    # Track attempts
+    attempts = verification.attempts + 1
+    max_att = verification.max_attempts or 5
+    db.collection("email_verifications").document(str(rec_id)).update({"attempts": attempts})
+
+    if attempts > max_att:
+        mark_email_verification_used(rec_id)
+        return False, "Maximum verification attempts exceeded. Please request a new OTP.", None
+
+    # Verify bcrypt hash
+    stored_hash = verification.hashed_otp or ""
+    if not verify_otp_hash(plain_otp, stored_hash):
+        return False, "Invalid verification code. Please try again.", None
+
+    # Mark used on success
+    mark_email_verification_used(rec_id)
+    return True, "Email verification successful.", verification
 
 
 def mark_email_verification_used(verification_id: int):
@@ -2143,10 +2204,11 @@ def get_latest_password_reset(user_id: int, otp_code: str = "") -> Optional[Pass
 # ============================================================
 
 def create_login_otp(email: str, otp_code: str, expires_at: datetime) -> Tuple[bool, str, Optional[dict]]:
+    """Create a new login OTP with bcrypt hash, invalidating any previous active OTPs for this email."""
     db = get_firestore_db()
     clean_email = str(email).strip().lower()
 
-    # Check resend cooldown
+    # 1. Check resend cooldown
     recent_docs = (
         db.collection("login_otps")
         .where("email", "==", clean_email)
@@ -2162,17 +2224,40 @@ def create_login_otp(email: str, otp_code: str, expires_at: datetime) -> Tuple[b
             if created.tzinfo is None:
                 created = created.replace(tzinfo=timezone.utc)
             elapsed = (datetime.now(timezone.utc) - created).total_seconds()
-            if elapsed < settings.OTP_RESEND_COOLDOWN_SECONDS:
+            cooldown = getattr(settings, "OTP_RESEND_COOLDOWN_SECONDS", 60) or 60
+            if elapsed < cooldown:
                 return False, f"Please wait before requesting another OTP.", None
 
+    # 2. Invalidate previous unused login OTPs for this email
+    try:
+        prev_docs = (
+            db.collection("login_otps")
+            .where("email", "==", clean_email)
+            .where("is_used", "==", False)
+            .stream()
+        )
+        batch = db.batch()
+        count = 0
+        for doc in prev_docs:
+            batch.update(doc.reference, {"is_used": True})
+            count += 1
+        if count > 0:
+            batch.commit()
+    except Exception as e:
+        logger.warning("Could not invalidate previous login OTPs for %s: %s", clean_email, e)
+
     lo_id = get_next_id("login_otps")
+    hashed_val = hash_otp(otp_code)
+    max_att = getattr(settings, "OTP_MAX_ATTEMPTS", 5) or 5
+
     data = {
         "id": lo_id,
         "email": clean_email,
-        "otp_code": str(otp_code).strip(),
+        "hashed_otp": hashed_val,  # Bcrypt hash only
         "expires_at": expires_at,
         "is_used": False,
         "attempts": 0,
+        "max_attempts": max_att,
         "created_at": datetime.now(timezone.utc),
     }
     db.collection("login_otps").document(str(lo_id)).set(data)
@@ -2180,6 +2265,7 @@ def create_login_otp(email: str, otp_code: str, expires_at: datetime) -> Tuple[b
 
 
 def verify_login_otp_code(email: str, otp_code: str) -> Tuple[bool, str, Optional[dict]]:
+    """Verify submitted login OTP against stored bcrypt hash, enforcing attempts and expiration."""
     db = get_firestore_db()
     clean_email = str(email).strip().lower()
 
@@ -2206,15 +2292,24 @@ def verify_login_otp_code(email: str, otp_code: str) -> Tuple[bool, str, Optiona
             db.collection("login_otps").document(str(rec_id)).update({"is_used": True})
             return False, "This email verification code has expired. Please request a new OTP.", None
 
-    # Check attempt limit
+    # Check and increment attempt limit
     attempts = record.get("attempts", 0) + 1
+    max_att = record.get("max_attempts") or getattr(settings, "OTP_MAX_ATTEMPTS", 5) or 5
     db.collection("login_otps").document(str(rec_id)).update({"attempts": attempts})
 
-    if attempts > settings.OTP_MAX_ATTEMPTS:
+    if attempts > max_att:
         db.collection("login_otps").document(str(rec_id)).update({"is_used": True})
         return False, "Too many verification attempts. Please request a new OTP.", None
 
-    if str(record.get("otp_code", "")).strip() != str(otp_code).strip():
+    # Verify bcrypt hash (with fallback to plaintext comparison for legacy records)
+    is_valid = False
+    stored_hash = record.get("hashed_otp")
+    if stored_hash:
+        is_valid = verify_otp_hash(otp_code, stored_hash)
+    elif record.get("otp_code"):
+        is_valid = (str(record.get("otp_code")).strip() == str(otp_code).strip())
+
+    if not is_valid:
         return False, "Invalid email verification code. Please try again.", None
 
     # Success: mark used
@@ -2222,12 +2317,12 @@ def verify_login_otp_code(email: str, otp_code: str) -> Tuple[bool, str, Optiona
     return True, "Email login verified.", record
 
 
-def get_latest_login_otp(email: str, otp_code: str) -> Optional[dict]:
+def get_latest_login_otp(email: str, otp_code: str = "") -> Optional[dict]:
+    """Retrieve the latest unused login OTP record for an email."""
     db = get_firestore_db()
     docs = (
         db.collection("login_otps")
         .where("email", "==", str(email).strip().lower())
-        .where("otp_code", "==", str(otp_code).strip())
         .where("is_used", "==", False)
         .stream()
     )
@@ -2241,6 +2336,79 @@ def get_latest_login_otp(email: str, otp_code: str) -> Optional[dict]:
 def mark_login_otp_used(otp_id: int):
     db = get_firestore_db()
     db.collection("login_otps").document(str(otp_id)).update({"is_used": True})
+
+
+def sanitize_all_otp_records() -> dict:
+    """
+    Security migration utility: Safely cleanses any legacy plaintext OTP fields from
+    Firestore collections (`email_verifications`, `login_otps`, `password_resets`, `pending_registrations`).
+    Converts any unhashed records to bcrypt or safely invalidates them.
+    """
+    db = get_firestore_db()
+    stats = {"email_verifications_cleaned": 0, "login_otps_cleaned": 0, "password_resets_cleaned": 0, "pending_cleaned": 0}
+
+    # 1. Clean email_verifications
+    try:
+        docs = db.collection("email_verifications").stream()
+        for doc in docs:
+            data = doc.to_dict()
+            if "otp_code" in data and data["otp_code"]:
+                raw = str(data["otp_code"]).strip()
+                updates = {"otp_code": ""}
+                if not data.get("hashed_otp"):
+                    updates["hashed_otp"] = hash_otp(raw)
+                doc.reference.update(updates)
+                stats["email_verifications_cleaned"] += 1
+    except Exception as e:
+        logger.warning("Sanitize email_verifications: %s", e)
+
+    # 2. Clean login_otps
+    try:
+        docs = db.collection("login_otps").stream()
+        for doc in docs:
+            data = doc.to_dict()
+            if "otp_code" in data and data["otp_code"]:
+                raw = str(data["otp_code"]).strip()
+                updates = {"otp_code": ""}
+                if not data.get("hashed_otp"):
+                    updates["hashed_otp"] = hash_otp(raw)
+                doc.reference.update(updates)
+                stats["login_otps_cleaned"] += 1
+    except Exception as e:
+        logger.warning("Sanitize login_otps: %s", e)
+
+    # 3. Clean password_resets
+    try:
+        docs = db.collection("password_resets").stream()
+        for doc in docs:
+            data = doc.to_dict()
+            if "otp_code" in data and data["otp_code"]:
+                raw = str(data["otp_code"]).strip()
+                updates = {"otp_code": ""}
+                if not data.get("hashed_otp"):
+                    updates["hashed_otp"] = hash_otp(raw)
+                doc.reference.update(updates)
+                stats["password_resets_cleaned"] += 1
+    except Exception as e:
+        logger.warning("Sanitize password_resets: %s", e)
+
+    # 4. Clean pending_registrations
+    try:
+        docs = db.collection("pending_registrations").stream()
+        for doc in docs:
+            data = doc.to_dict()
+            if "otp_code" in data and data["otp_code"]:
+                raw = str(data["otp_code"]).strip()
+                updates = {"otp_code": ""}
+                if not data.get("hashed_otp"):
+                    updates["hashed_otp"] = hash_otp(raw)
+                doc.reference.update(updates)
+                stats["pending_cleaned"] += 1
+    except Exception as e:
+        logger.warning("Sanitize pending_registrations: %s", e)
+
+    logger.info("[SECURITY] OTP sanitization completed: %s", stats)
+    return stats
 
 
 # ============================================================

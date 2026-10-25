@@ -161,30 +161,6 @@ export default function VerifyEmail() {
           }}
         />
 
-        {/* Top Controls */}
-        <div style={{ position: "absolute", top: 24, left: 24, zIndex: 10 }}>
-          <button
-            type="button"
-            onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/register"))}
-            aria-label="Go back"
-            title="Go back"
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "var(--bg-glass, rgba(255, 255, 255, 0.05))",
-              border: "1px solid var(--border-color, rgba(255, 255, 255, 0.1))",
-              color: "var(--text-secondary, #94a3b8)",
-              cursor: "pointer",
-            }}
-          >
-            <FiArrowLeft size={18} />
-          </button>
-        </div>
-
         <div style={{ position: "absolute", top: 24, right: 24, zIndex: 10 }}>
           <ThemeToggle />
         </div>
@@ -209,6 +185,33 @@ export default function VerifyEmail() {
             backdropFilter: "blur(16px)",
           }}
         >
+          {/* Back button aligned inside card */}
+          <button
+            type="button"
+            onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/register"))}
+            aria-label="Go back"
+            title="Go back"
+            style={{
+              position: "absolute",
+              top: 18,
+              left: 18,
+              width: 40,
+              height: 40,
+              minWidth: 42,
+              minHeight: 42,
+              borderRadius: 12,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "var(--bg-glass, rgba(255, 255, 255, 0.05))",
+              border: "1px solid var(--border-color, rgba(255, 255, 255, 0.1))",
+              color: "var(--text-secondary, #94a3b8)",
+              cursor: "pointer",
+              zIndex: 3,
+            }}
+          >
+            <FiArrowLeft size={18} />
+          </button>
           {/* Logo Branding */}
           <Link
             to="/"
