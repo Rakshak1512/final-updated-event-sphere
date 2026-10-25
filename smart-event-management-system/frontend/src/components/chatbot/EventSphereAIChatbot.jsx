@@ -221,7 +221,7 @@ export default function EventSphereAIChatbot() {
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ display: "flex", gap: 4 }}>
               <button
                 onClick={handleClear}
                 style={{
@@ -230,11 +230,17 @@ export default function EventSphereAIChatbot() {
                   color: "#ffffff",
                   opacity: 0.85,
                   cursor: "pointer",
-                  padding: 4,
+                  width: 36,
+                  height: 36,
+                  minWidth: 36,
+                  minHeight: 36,
                   display: "flex",
                   alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "8px",
                 }}
                 title="Clear Chat"
+                aria-label="Clear chat messages"
               >
                 <FiTrash2 size={16} />
               </button>
@@ -246,11 +252,17 @@ export default function EventSphereAIChatbot() {
                   color: "#ffffff",
                   opacity: 0.85,
                   cursor: "pointer",
-                  padding: 4,
+                  width: 36,
+                  height: 36,
+                  minWidth: 36,
+                  minHeight: 36,
                   display: "flex",
                   alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "8px",
                 }}
                 title="Close"
+                aria-label="Close chatbot"
               >
                 <FiX size={18} />
               </button>
@@ -341,15 +353,16 @@ export default function EventSphereAIChatbot() {
                   type="button"
                   onClick={() => handleSend(s)}
                   style={{
-                    padding: "5px 12px",
+                    padding: "6px 12px",
                     borderRadius: 12,
                     background: "var(--bg-elevated)",
                     border: "1px solid rgba(139, 92, 246, 0.3)",
                     color: "#8b5cf6",
-                    fontSize: 11.5,
+                    fontSize: 12,
                     fontWeight: 600,
                     cursor: "pointer",
                     flexShrink: 0,
+                    minHeight: 32,
                   }}
                 >
                   {s}
@@ -380,6 +393,7 @@ export default function EventSphereAIChatbot() {
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask EventSphere AI..."
               disabled={loading}
+              className="chatbot-input"
               style={{
                 flex: 1,
                 padding: "10px 14px",
@@ -387,7 +401,7 @@ export default function EventSphereAIChatbot() {
                 border: "1.5px solid var(--border-color)",
                 background: "var(--input-bg)",
                 color: "var(--text-primary)",
-                fontSize: 13,
+                fontSize: 16,
                 outline: "none",
               }}
             />
@@ -395,9 +409,12 @@ export default function EventSphereAIChatbot() {
               type="submit"
               disabled={loading || !input.trim()}
               className="btn btn-primary"
+              aria-label="Send message"
               style={{
-                width: 38,
-                height: 38,
+                width: 44,
+                height: 44,
+                minWidth: 44,
+                minHeight: 44,
                 borderRadius: 12,
                 padding: 0,
                 display: "flex",
@@ -406,9 +423,26 @@ export default function EventSphereAIChatbot() {
                 flexShrink: 0,
               }}
             >
-              <FiSend size={15} />
+              <FiSend size={16} />
             </button>
           </form>
+
+          <style>{`
+            @media (max-width: 480px) {
+              .chatbot-window {
+                right: max(10px, env(safe-area-inset-right, 0px)) !important;
+                bottom: calc(env(safe-area-inset-bottom, 12px) + 68px) !important;
+                width: calc(100vw - 20px) !important;
+                max-width: calc(100vw - 20px) !important;
+                height: 480px !important;
+                max-height: calc(100dvh - 84px) !important;
+                border-radius: 20px !important;
+              }
+              .chatbot-input {
+                font-size: 16px !important;
+              }
+            }
+          `}</style>
         </div>
       )}
     </>

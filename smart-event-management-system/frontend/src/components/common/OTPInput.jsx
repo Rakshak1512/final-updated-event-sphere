@@ -410,11 +410,13 @@ export default function OTPInput({
         className="glass-card"
         style={{
           marginTop: "20px",
-          padding: "12px 18px",
+          padding: "12px 16px",
           borderRadius: "14px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "10px",
           fontSize: "13px",
           background: "var(--bg-glass)",
         }}
@@ -445,8 +447,9 @@ export default function OTPInput({
             gap: 6,
             cursor: canResend && !resending && !disabled ? "pointer" : "not-allowed",
             transition: "all 0.15s ease",
-            padding: "4px 8px",
-            borderRadius: "6px",
+            padding: "6px 10px",
+            borderRadius: "8px",
+            minHeight: "38px",
           }}
         >
           <FiRotateCw size={13} className={resending ? "spin-icon" : ""} />

@@ -434,8 +434,11 @@ export default function EventsBrowse({ embedded = false }) {
             </div>
           </div>
 
-          {/* Days of the Week Header */}
-          <div
+          {/* Responsive Touch Scroll Container for Mobile / Tablets */}
+          <div className="calendar-scroll-wrap">
+            <div className="calendar-inner-container">
+              {/* Days of the Week Header */}
+              <div
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(7, 1fr)",
@@ -648,6 +651,8 @@ export default function EventsBrowse({ embedded = false }) {
               })()}
             </div>
           )}
+            </div>
+          </div>
         </div>
       )}
 

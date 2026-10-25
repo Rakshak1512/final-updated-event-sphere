@@ -44,6 +44,7 @@ class User:
         rejected_at: Optional[datetime] = None,
         rejection_reason: Optional[str] = None,
         notification_preferences: Optional[dict] = None,
+        token_valid_after: Optional[datetime] = None,
         created_at: Optional[datetime] = None,
         updated_at: Optional[datetime] = None,
     ):
@@ -109,6 +110,7 @@ class User:
             self.rejected_by = rejected_by
         self.rejected_at = rejected_at
         self.rejection_reason = rejection_reason
+        self.token_valid_after = token_valid_after
         self.created_at = created_at or datetime.utcnow()
         self.updated_at = updated_at or datetime.utcnow()
 
@@ -137,6 +139,7 @@ class User:
             "rejected_at": self.rejected_at,
             "rejection_reason": self.rejection_reason,
             "notification_preferences": self.notification_preferences or {"in_app": True, "email": True},
+            "token_valid_after": self.token_valid_after,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -176,6 +179,7 @@ class User:
             rejected_at=data.get("rejected_at"),
             rejection_reason=data.get("rejection_reason"),
             notification_preferences=data.get("notification_preferences") or {"in_app": True, "email": True},
+            token_valid_after=data.get("token_valid_after"),
             created_at=data.get("created_at"),
             updated_at=data.get("updated_at"),
         )

@@ -532,6 +532,74 @@ def send_certificate_uploaded_email(to_email: str, name: str, cert_title: str) -
     return send_email(to_email, subject, html, f"New Certificate: {cert_title}")
 
 
+def send_certificate_updated_email(to_email: str, name: str, cert_title: str) -> bool:
+    """Send certificate updated/corrected notification email via SMTP."""
+    if not _user_allows_email(to_email):
+        return True
+    subject = f"Certificate Updated: {cert_title}"
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>{subject}</title></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f172a; margin: 0; padding: 24px 16px; color: #f8fafc;">
+  <div style="max-width: 500px; margin: 0 auto; background: #1e293b; border-radius: 16px; border: 1px solid #334155; padding: 28px 24px; text-align: center;">
+    <h2 style="color: #38bdf8; margin-top: 0;">📜 Certificate Correction/Update</h2>
+    <p style="color: #cbd5e1; font-size: 14.5px;">Hi <strong>{name}</strong>, your certificate <strong>{cert_title}</strong> has been updated with verified corrections.</p>
+    <p style="color: #94a3b8; font-size: 13px;">Please log in to your EventSphere profile to view or download the updated certificate.</p>
+  </div>
+</body>
+</html>"""
+    return send_email(to_email, subject, html, f"Certificate Updated: {cert_title}")
+
+
+def send_certificate_revoked_email(to_email: str, name: str, cert_title: str, reason: Optional[str] = None) -> bool:
+    """Send certificate withdrawal/revocation notification email via SMTP."""
+    if not _user_allows_email(to_email):
+        return True
+    subject = f"Certificate Status Notice: {cert_title}"
+    reason_text = reason or "Administrative review or event record adjustment."
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>{subject}</title></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f172a; margin: 0; padding: 24px 16px; color: #f8fafc;">
+  <div style="max-width: 500px; margin: 0 auto; background: #1e293b; border-radius: 16px; border: 1px solid #334155; padding: 28px 24px; text-align: center;">
+    <h2 style="color: #f87171; margin-top: 0;">⚠️ Certificate Notice</h2>
+    <p style="color: #cbd5e1; font-size: 14.5px;">Hi <strong>{name}</strong>, please note that certificate <strong>{cert_title}</strong> has been withdrawn or archived.</p>
+    <p style="color: #94a3b8; font-size: 13px;">Reason: {reason_text}</p>
+  </div>
+</body>
+</html>"""
+    return send_email(to_email, subject, html, f"Certificate Status Notice: {cert_title}. Reason: {reason_text}")
+
+
+def send_event_updated_email(to_email: str, name: str, event_title: str, update_details: str) -> bool:
+    """Send event schedule or venue update notification email via SMTP."""
+    if not _user_allows_email(to_email):
+        return True
+    subject = f"Important Update: {event_title}"
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>{subject}</title></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f172a; margin: 0; padding: 24px 16px; color: #f8fafc;">
+  <div style="max-width: 500px; margin: 0 auto; background: #1e293b; border-radius: 16px; border: 1px solid #334155; overflow: hidden;">
+    <div style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); padding: 24px; text-align: center;">
+      <h2 style="margin: 0; color: #ffffff;">Event Information Update</h2>
+    </div>
+    <div style="padding: 24px;">
+      <p style="margin: 0 0 14px; font-size: 14.5px; color: #f1f5f9;">Hello <strong>{name}</strong>,</p>
+      <p style="margin: 0 0 16px; font-size: 13.5px; color: #cbd5e1; line-height: 1.5;">
+        There has been an update regarding <strong>{event_title}</strong>:
+      </p>
+      <div style="background: #0f172a; padding: 14px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #334155;">
+        <p style="margin: 0; font-size: 13px; color: #a5b4fc;"><strong>Details:</strong> {update_details}</p>
+      </div>
+      <p style="margin: 0; font-size: 12.5px; color: #94a3b8;">Log in to EventSphere to view your updated schedule and ticket details.</p>
+    </div>
+  </div>
+</body>
+</html>"""
+    return send_email(to_email, subject, html, f"Important Update for {event_title}: {update_details}")
+
+
 def send_registration_cancellation_email(
     to_email: str,
     name: str,

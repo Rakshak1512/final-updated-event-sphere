@@ -236,7 +236,7 @@ export default function ForgotPassword() {
           style={{
             width: "100%",
             maxWidth: 500,
-            padding: "36px 32px",
+            padding: "clamp(22px, 5vw, 36px) clamp(14px, 4vw, 32px)",
             borderRadius: 24,
             background: "var(--bg-elevated)",
             border: "1.5px solid rgba(139, 92, 246, 0.3)",
@@ -263,12 +263,12 @@ export default function ForgotPassword() {
             title="Go back"
             style={{
               position: "absolute",
-              top: 18,
-              left: 18,
-              width: 40,
-              height: 40,
-              minWidth: 42,
-              minHeight: 42,
+              top: 16,
+              left: 16,
+              width: 44,
+              height: 44,
+              minWidth: 44,
+              minHeight: 44,
               borderRadius: 12,
               display: "flex",
               alignItems: "center",

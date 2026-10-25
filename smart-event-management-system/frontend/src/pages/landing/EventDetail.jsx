@@ -243,7 +243,7 @@ export default function EventDetail({ embedded = false }) {
         <p>Event not found.</p>
       ) : (
         <div className="glass-card" style={{ overflow: "hidden" }}>
-          <div style={{ height: 280, position: "relative", overflow: "hidden" }}>
+          <div style={{ height: "clamp(200px, 40vw, 320px)", position: "relative", overflow: "hidden" }}>
             <EventImage
               src={event.poster_url}
               alt={event.title}
@@ -252,7 +252,7 @@ export default function EventDetail({ embedded = false }) {
             />
           </div>
 
-          <div style={{ padding: 32 }}>
+          <div style={{ padding: "clamp(18px, 4vw, 32px)" }}>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
               <span className="badge badge-info">{event.category}</span>
               {event.registration_type && (
@@ -266,10 +266,10 @@ export default function EventDetail({ embedded = false }) {
               )}
             </div>
 
-            <h1 style={{ fontSize: 28, marginBottom: 14 }}>{event.title}</h1>
+            <h1 style={{ fontSize: "clamp(22px, 3.5vw, 28px)", marginBottom: 14 }}>{event.title}</h1>
             <p style={{ color: "var(--text-secondary)", lineHeight: 1.7, marginBottom: 26 }}>{event.description}</p>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 26 }}>
+            <div className="event-info-grid">
               <InfoBlock icon={<FiCalendar />} label="Date" value={formatDate(event.event_date)} />
               <InfoBlock icon={<FiClock />} label="Time" value={event.event_time} />
               <InfoBlock icon={<FiMapPin />} label="Venue" value={event.venue} />

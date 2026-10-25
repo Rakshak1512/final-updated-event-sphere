@@ -1,6 +1,4 @@
-"""
-Reusable FastAPI dependencies: current user extraction, role guards.
-"""
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import Depends, HTTPException, Request, status
@@ -24,7 +22,10 @@ def get_current_user_optional(token: str = Depends(oauth2_scheme)) -> Optional[U
         if user_id is None:
             return None
         resolved_id = int(user_id) if str(user_id).isdigit() else str(user_id)
-        return get_user_by_id(resolved_id)
+        user = get_user_by_id(resolved_id)
+        if user and not getattr(user, "is_email_verified", False):
+            return None
+        return user
     except Exception:
         return None
 
@@ -54,6 +55,34 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
 
     if user is None:
         raise credentials_exception
+
+    # Strictly block unverified accounts from accessing protected resources
+    if not getattr(user, "is_email_verified", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email address before accessing this resource.",
+        )
+
+    # Enforce session revocation (explicit logout)
+    token_valid_after = getattr(user, "token_valid_after", None)
+    if token_valid_after:
+        if isinstance(token_valid_after, str):
+            try:
+                token_valid_after = datetime.fromisoformat(token_valid_after)
+            except Exception:
+                token_valid_after = None
+        if isinstance(token_valid_after, datetime):
+            if token_valid_after.tzinfo is None:
+                token_valid_after = token_valid_after.replace(tzinfo=timezone.utc)
+            token_iat = payload.get("iat")
+            if token_iat:
+                token_issued = datetime.fromtimestamp(token_iat, tz=timezone.utc)
+                if token_issued <= token_valid_after:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Session has been invalidated. Please log in again.",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
 
     return user
 

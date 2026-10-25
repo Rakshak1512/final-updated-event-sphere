@@ -703,10 +703,12 @@ export default function StudentApprovals() {
               border: "1px solid var(--border-color)",
             }}
           >
-            <div style={{ overflowX: "auto" }}>
+            <div className="table-wrap">
               <table
+                className="data-table"
                 style={{
                   width: "100%",
+                  minWidth: 640,
                   borderCollapse: "collapse",
                   textAlign: "left",
                   fontSize: "0.9rem",

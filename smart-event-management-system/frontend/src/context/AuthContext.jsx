@@ -149,6 +149,11 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
+      await api.post("/auth/logout");
+    } catch {
+      // Continue clearing session even if network call fails
+    }
+    try {
       await signOutFirebase();
     } catch {
       // Continue clearing the EventSphere session even if Firebase sign-out fails.

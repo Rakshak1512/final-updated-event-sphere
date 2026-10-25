@@ -116,7 +116,10 @@ def _log(user_id, action: str, request: Request, details: str = None):
 
 @router.post("/firebase/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 def firebase_register(payload: FirebaseRegisterRequest, request: Request):
-    """Create/synchronize the EventSphere profile after Firebase creates the account."""
+    """
+    Secure Firebase registration profile synchronization.
+    Strictly prevents self-assigned admin roles, role escalation, and direct unverified account creation.
+    """
     try:
         decoded = verify_firebase_id_token(payload.id_token)
     except Exception as e:
@@ -130,19 +133,24 @@ def firebase_register(payload: FirebaseRegisterRequest, request: Request):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Email verification is required before your account details can be added to the database. Please verify your email first.",
         )
-    role_str = payload.role.value if hasattr(payload.role, "value") else str(payload.role)
 
-    if payload.role == RoleEnum.student and not payload.registration_number:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Registration number is required for students")
+    # Strictly block unauthorized self-assignment of Admin privileges
     if payload.role == RoleEnum.admin:
-        if not (payload.admin_id or payload.registration_number):
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Admin ID is required for admins")
-        if not db_service.is_admin_registration_available():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="An active Admin account already exists. Only one Admin account is permitted.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Self-assignment of the Admin role is strictly forbidden.",
+        )
 
     existing = db_service.get_user_by_email(clean_email)
-    if existing and existing.is_email_verified:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="An account with this email already exists.")
+    if existing and not getattr(existing, "is_deleted", False) and str(getattr(existing, "approval_status", "")).upper() not in ("REMOVED", "DELETED"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="An account with this email already exists. Please proceed to login.",
+        )
+
+    role_str = payload.role.value if hasattr(payload.role, "value") else str(payload.role)
+    if payload.role == RoleEnum.student and not payload.registration_number:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Registration number is required for students")
 
     if payload.registration_number and payload.role == RoleEnum.student:
         existing_reg = db_service.get_user_by_reg_no(payload.registration_number)
@@ -158,41 +166,27 @@ def firebase_register(payload: FirebaseRegisterRequest, request: Request):
             init_active = True
             init_status = "APPROVED"
 
-        if existing:
-            updates = {
-                "name": payload.name.strip(),
-                "role": role_str,
-                "registration_number": payload.registration_number or existing.registration_number,
-                "admin_id": payload.admin_id or existing.admin_id,
-                "department": payload.department or existing.department,
-                "semester": payload.semester or existing.semester,
-                "is_email_verified": token_verified,
-            }
-            user = db_service.update_user(existing.id, updates)
-        else:
-            user = db_service.create_user(
-                name=payload.name.strip(),
-                email=clean_email,
-                # Firebase owns password authentication. Keep a non-usable
-                # local hash for backward compatibility with existing schema.
-                hashed_password=hash_password(secrets.token_urlsafe(32)),
-                role=role_str,
-                registration_number=payload.registration_number,
-                admin_id=payload.admin_id,
-                department=payload.department,
-                semester=payload.semester,
-                is_email_verified=token_verified,
-                is_active=init_active,
-                approval_status=init_status,
-            )
-            if role_lower in ("student", "faculty", "volunteer"):
-                try:
-                    send_account_pending_approval_email(clean_email, payload.name.strip(), role_lower)
-                    if role_lower == "faculty":
-                        admin_recipient = getattr(settings, "ADMIN_EMAIL", "admin@test.com")
-                        send_admin_new_faculty_alert_email(admin_recipient, user.name, user.email, user.department)
-                except Exception as mail_err:
-                    logger.warning("[EMAIL] Failed to send registration email: %s", mail_err)
+        user = db_service.create_user(
+            name=payload.name.strip(),
+            email=clean_email,
+            hashed_password=hash_password(secrets.token_urlsafe(32)),
+            role=role_str,
+            registration_number=payload.registration_number,
+            admin_id=payload.admin_id,
+            department=payload.department,
+            semester=payload.semester,
+            is_email_verified=token_verified,
+            is_active=init_active,
+            approval_status=init_status,
+        )
+        if role_lower in ("student", "faculty", "volunteer"):
+            try:
+                send_account_pending_approval_email(clean_email, payload.name.strip(), role_lower)
+                if role_lower == "faculty":
+                    admin_recipient = getattr(settings, "ADMIN_EMAIL", "admin@test.com")
+                    send_admin_new_faculty_alert_email(admin_recipient, user.name, user.email, user.department)
+            except Exception as mail_err:
+                logger.warning("[EMAIL] Failed to send registration email: %s", mail_err)
 
         logger.info(
             "Firebase profile synchronized for %s (verified=%s, status=%s)",
@@ -300,8 +294,8 @@ def register(payload: UserCreate, request: Request):
             reg_num = admin_id
         if not db_service.is_admin_registration_available():
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="An active Admin account already exists. Only one Admin account is permitted.",
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Self-assignment of the Admin role is strictly forbidden.",
             )
 
     # Validate role-specific required identifiers
@@ -320,7 +314,7 @@ def register(payload: UserCreate, request: Request):
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Admin ID is required for admins")
 
     existing = db_service.get_user_by_email(clean_email)
-    if existing and existing.is_email_verified and not getattr(existing, "is_deleted", False):
+    if existing and not getattr(existing, "is_deleted", False) and str(getattr(existing, "approval_status", "")).upper() not in ("REMOVED", "DELETED"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="An account with this email already exists.")
 
     if reg_num and payload.role == RoleEnum.student:
@@ -413,13 +407,28 @@ def verify_email(payload: VerifyEmailRequest, request: Request):
     clean_email = str(payload.email).strip().lower()
     otp_input = str(payload.otp_code).strip()
 
-    # 1. Check pending registration (staged before adding to users table)
+    if not otp_input:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OTP verification code is required.",
+        )
+
+    # 1. Prevent querying verify-email for accounts that have already completed verification
+    existing_user = db_service.get_user_by_email(clean_email)
+    if existing_user and getattr(existing_user, "is_email_verified", False) and not getattr(existing_user, "is_deleted", False):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This account has already completed verification. Please proceed to login.",
+        )
+
+    # 2. Check pending registration (staged before adding to users table)
     pending = db_service.get_pending_registration(clean_email)
     if pending:
         # Check attempts limit
         attempts = int(pending.get("attempts", 0))
-        max_attempts = int(pending.get("max_attempts", settings.OTP_MAX_ATTEMPTS))
+        max_attempts = int(pending.get("max_attempts", settings.OTP_MAX_ATTEMPTS or 5))
         if attempts >= max_attempts:
+            db_service.delete_pending_registration(clean_email)
             logger.warning("OTP verification failed (max attempts exceeded) for %s", _mask_email(clean_email))
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -432,42 +441,49 @@ def verify_email(payload: VerifyEmailRequest, request: Request):
             if exp.tzinfo is None:
                 exp = exp.replace(tzinfo=timezone.utc)
             if exp < datetime.now(timezone.utc):
+                db_service.delete_pending_registration(clean_email)
                 logger.warning("OTP verification failed (expired OTP) for %s", _mask_email(clean_email))
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="This OTP has expired. Please request a new OTP.",
                 )
 
-        # Constant-time secure verification
+        # Constant-time secure verification with bcrypt hash
         hashed_otp = pending.get("hashed_otp")
         is_match = False
         if hashed_otp and verify_otp_hash(otp_input, hashed_otp):
             is_match = True
-        elif pending.get("otp_code") and str(pending.get("otp_code")).strip() == otp_input:
-            is_match = True
 
         if not is_match:
-            pending["attempts"] = attempts + 1
+            new_attempts = attempts + 1
+            pending["attempts"] = new_attempts
             db_service.save_pending_registration(pending)
             logger.warning(
                 "OTP verification failed (invalid OTP) for %s (attempt %d/%d)",
                 _mask_email(clean_email),
-                attempts + 1,
+                new_attempts,
                 max_attempts,
             )
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OTP. Please try again.")
+            if new_attempts >= max_attempts:
+                db_service.delete_pending_registration(clean_email)
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Maximum verification attempts exceeded. Please request a new OTP.",
+                )
+            remaining = max_attempts - new_attempts
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid OTP. {remaining} attempt(s) remaining.")
+
+        # Immediately delete pending registration to prevent concurrent reuse / replay
+        db_service.delete_pending_registration(clean_email)
 
         # Determine approval status: students & volunteers require faculty approval; faculty require admin approval
-        p_role = str(pending.get("role", "")).lower()
-        if p_role in ("student", "faculty", "volunteer"):
-            appr_status = "PENDING"
-            is_active_flag = False
-        else:
-            appr_status = "APPROVED"
-            is_active_flag = True
-
-        # Create user in permanent users table now that email is verified
+        p_role = str(pending.get("role", "student")).lower()
         if p_role == "admin":
+            if not db_service.is_admin_registration_available():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Self-assignment of the Admin role is strictly forbidden.",
+                )
             ok, msg, created_user = db_service.create_admin_user_atomic(
                 name=pending["name"],
                 email=pending["email"],
@@ -480,9 +496,10 @@ def verify_email(payload: VerifyEmailRequest, request: Request):
                 is_email_verified=True,
             )
             if not ok or not created_user:
-                db_service.delete_pending_registration(clean_email)
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg or "Admin account creation failed.")
         else:
+            appr_status = "PENDING"
+            is_active_flag = False
             created_user = db_service.create_user(
                 name=pending["name"],
                 email=pending["email"],
@@ -498,8 +515,7 @@ def verify_email(payload: VerifyEmailRequest, request: Request):
                 approval_status=appr_status,
             )
 
-        db_service.delete_pending_registration(clean_email)
-        logger.info("[AUTH] [APPROVAL] User %s created with status %s (ID: %s)", _mask_email(clean_email), appr_status, created_user.id)
+        logger.info("[AUTH] [APPROVAL] User %s created with status %s (ID: %s)", _mask_email(clean_email), appr_status if p_role != "admin" else "APPROVED", created_user.id)
         _log(created_user.id, "verify_email", request)
 
         # Dispatch async approval notification emails
@@ -514,16 +530,19 @@ def verify_email(payload: VerifyEmailRequest, request: Request):
 
         return created_user
 
-    # 2. Legacy fallback for users created prior to pending table
+    # 3. Fallback for legacy unverified user
     user = db_service.get_user_by_email(clean_email)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No registration found for this email. Please register first.",
+            detail="No pending registration found for this email. Please register first.",
         )
 
-    if user.is_email_verified:
-        return user
+    if getattr(user, "is_email_verified", False):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This account has already completed verification. Please proceed to login.",
+        )
 
     ok, msg, verification = db_service.verify_email_verification_otp(user.id, otp_input)
     if not ok:
@@ -861,6 +880,10 @@ def refresh_token(payload: TokenRefreshRequest):
     user = db_service.get_user_by_id(resolved_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
+    if not getattr(user, "is_email_verified", False):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Please verify your email address before continuing.")
+
     appr_st = str(getattr(user, "approval_status", "APPROVED") or "APPROVED").upper().strip()
     if not user.is_active and appr_st not in ("PENDING", "PENDING_FACULTY_APPROVAL", "PENDING_ADMIN_APPROVAL", "REJECTED"):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
@@ -870,6 +893,15 @@ def refresh_token(payload: TokenRefreshRequest):
     new_refresh_token = create_refresh_token({"sub": str(user.id)})
 
     return Token(access_token=access_token, refresh_token=new_refresh_token, user=user)
+
+
+@router.post("/logout")
+def logout(request: Request, current_user: User = Depends(get_current_user)):
+    """Explicit logout invalidating the active session token and refresh capability."""
+    now_utc = datetime.now(timezone.utc)
+    db_service.update_user(current_user.id, {"token_valid_after": now_utc})
+    _log(current_user.id, "logout", request)
+    return {"message": "Logged out successfully. Session invalidated."}
 
 
 @router.post("/forgot-password")

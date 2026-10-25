@@ -214,7 +214,7 @@ export default function Register() {
           style={{
             width: "100%",
             maxWidth: 540,
-            padding: "36px 32px",
+            padding: "clamp(22px, 5vw, 36px) clamp(14px, 4vw, 32px)",
             borderRadius: "26px",
             background: "var(--bg-elevated)",
             border: "1.5px solid rgba(139, 92, 246, 0.3)",
@@ -234,12 +234,12 @@ export default function Register() {
             title="Go back"
             style={{
               position: "absolute",
-              top: 18,
-              left: 18,
-              width: 40,
-              height: 40,
-              minWidth: 42,
-              minHeight: 42,
+              top: 16,
+              left: 16,
+              width: 44,
+              height: 44,
+              minWidth: 44,
+              minHeight: 44,
               borderRadius: 12,
               display: "flex",
               alignItems: "center",
@@ -301,7 +301,11 @@ export default function Register() {
               padding: 4,
               marginBottom: 22,
               border: "1px solid var(--border-color)",
-              gap: 2,
+              gap: 4,
+              overflowX: "auto",
+              scrollbarWidth: "none",
+              WebkitOverflowScrolling: "touch",
+              maxWidth: "100%",
             }}
           >
             {[
@@ -317,14 +321,16 @@ export default function Register() {
                 className="btn btn-sm"
                 style={{
                   flex: 1,
+                  minWidth: "max-content",
                   background: form.role === r.id ? "var(--gradient-primary)" : "transparent",
                   color: form.role === r.id ? "#fff" : "var(--text-secondary)",
                   borderRadius: 999,
                   transition: "all 0.2s ease",
                   fontWeight: form.role === r.id ? 600 : 500,
                   fontSize: 12,
-                  padding: "6px 2px",
+                  padding: "6px 8px",
                   whiteSpace: "nowrap",
+                  minHeight: 38,
                 }}
               >
                 {r.label}

@@ -174,7 +174,7 @@ export default function VerifyEmail() {
           style={{
             width: "100%",
             maxWidth: 520,
-            padding: "36px 32px",
+            padding: "clamp(22px, 5vw, 36px) clamp(14px, 4vw, 32px)",
             borderRadius: 24,
             textAlign: "center",
             background: "var(--bg-card, #131b2e)",
@@ -193,12 +193,12 @@ export default function VerifyEmail() {
             title="Go back"
             style={{
               position: "absolute",
-              top: 18,
-              left: 18,
-              width: 40,
-              height: 40,
-              minWidth: 42,
-              minHeight: 42,
+              top: 16,
+              left: 16,
+              width: 44,
+              height: 44,
+              minWidth: 44,
+              minHeight: 44,
               borderRadius: 12,
               display: "flex",
               alignItems: "center",

@@ -139,6 +139,14 @@ def create_user(
     approval_status: Optional[str] = None,
 ) -> User:
     db = get_firestore_db()
+    clean_email = str(email).strip().lower()
+
+    # Deduplication and race condition prevention: Check if user already exists
+    existing = get_user_by_email(clean_email)
+    if existing and not getattr(existing, "is_deleted", False) and str(getattr(existing, "approval_status", "")).upper() not in ("REMOVED", "DELETED"):
+        logger.info("[DB] User with email %s already exists (ID: %s); returning existing record to prevent duplicates", clean_email, existing.id)
+        return existing
+
     user_id = get_next_id("users")
 
     role_str = (role.value if hasattr(role, "value") else str(role)).lower()
@@ -157,8 +165,8 @@ def create_user(
 
     user = User(
         id=user_id,
-        name=name,
-        email=email,
+        name=name.strip(),
+        email=clean_email,
         hashed_password=hashed_password,
         role=role,
         registration_number=registration_number,
@@ -176,6 +184,14 @@ def create_user(
         updated_at=datetime.now(timezone.utc),
     )
     db.collection("users").document(str(user_id)).set(user.to_dict())
+    try:
+        db.collection("user_emails").document(clean_email).set({
+            "user_id": user_id,
+            "created_at": datetime.now(timezone.utc),
+        })
+    except Exception as e:
+        logger.warning("Could not set email index document for %s: %s", clean_email, e)
+
     invalidate_user_caches(user_id)
     return user
 
@@ -1968,9 +1984,12 @@ def mark_all_notifications_read(user_id: int):
 def save_pending_registration(data: dict) -> dict:
     db = get_firestore_db()
     email = str(data["email"]).strip().lower()
+    clean_data = dict(data)
+    clean_data["email"] = email
+    clean_data.pop("otp_code", None)  # Plaintext OTP is NEVER stored in database
     doc_ref = db.collection("pending_registrations").document(email)
-    doc_ref.set(data)
-    return data
+    doc_ref.set(clean_data)
+    return clean_data
 
 
 def get_pending_registration(email: str) -> Optional[dict]:

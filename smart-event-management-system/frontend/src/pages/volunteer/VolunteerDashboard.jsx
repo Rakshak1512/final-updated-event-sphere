@@ -1444,7 +1444,7 @@ export default function VolunteerDashboard() {
 
               return (
                 <div className="table-wrap" style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5, textAlign: "left" }}>
+                  <table className="data-table" style={{ width: "100%", minWidth: 540, borderCollapse: "collapse", fontSize: 13.5, textAlign: "left" }}>
                     <thead>
                       <tr style={{ borderBottom: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>
                         <th style={{ padding: "12px 16px" }}>Student</th>

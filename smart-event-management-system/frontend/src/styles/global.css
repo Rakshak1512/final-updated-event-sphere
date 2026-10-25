@@ -505,13 +505,13 @@ img {
   .btn-sm {
     padding: 7px 12px;
     font-size: 12px;
-    min-height: 38px;
+    min-height: 40px;
   }
   .icon-btn {
-    width: 42px;
-    height: 42px;
-    min-width: 42px;
-    min-height: 42px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
   }
   .form-input,
   .form-select,
@@ -522,12 +522,75 @@ img {
 }
 @media (max-width: 360px) {
   .auth-card {
-    padding: 20px 10px;
+    padding: 20px 12px;
   }
   .btn {
     padding: 8px 12px;
-    font-size: 12px;
+    font-size: 12.5px;
+    min-height: 44px;
   }
+  .btn-sm {
+    padding: 6px 10px;
+    font-size: 11.5px;
+    min-height: 38px;
+  }
+}
+
+/* iOS Safari & Touch Device Font-Size Auto-Zoom Prevention */
+@media (max-width: 1024px), (hover: none) and (pointer: coarse) {
+  .form-input,
+  .form-select,
+  .form-textarea,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  input[type="search"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Accessible Keyboard Focus Indicators */
+:focus-visible {
+  outline: 2px solid #8b5cf6 !important;
+  outline-offset: 2px !important;
+}
+
+/* Event Info 4-Stat Responsive Grid */
+.event-info-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 26px;
+}
+@media (max-width: 900px) {
+  .event-info-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 14px !important;
+  }
+}
+@media (max-width: 440px) {
+  .event-info-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+}
+
+/* Calendar View Horizontal Touch Scrolling on Phones & Tablets */
+.calendar-scroll-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  padding-bottom: 4px;
+}
+.calendar-inner-container {
+  min-width: 580px;
 }
 
 /* ---------------- Stable Glass UI: No Unwanted Bobbing / Screen Shifting ---------------- */

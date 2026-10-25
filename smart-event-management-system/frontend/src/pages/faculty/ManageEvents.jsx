@@ -465,7 +465,7 @@ export default function ManageEvents() {
               <input className="form-input" value={form.title} onChange={update("title")} required placeholder="e.g. Annual Hackathon 2026" />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div className="modal-grid-2">
               <div className="form-group">
                 <label className="form-label">Category</label>
                 <select className="form-select" value={form.category} onChange={update("category")}>
@@ -485,7 +485,7 @@ export default function ManageEvents() {
               <textarea className="form-textarea" rows={3} value={form.description} onChange={update("description")} required />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+            <div className="modal-grid-3">
               <div className="form-group">
                 <label className="form-label">Event Date</label>
                 <input type="date" className="form-input" value={form.event_date} onChange={update("event_date")} required />
