@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "buildCommand": "node build.js",
+  "outputDirectory": "frontend/dist",
+  "functions": {
+    "api/**/*.py": {
+      "includeFiles": "{backend/**,frontend/dist/**,smart-event-management-system/backend/**,smart-event-management-system/frontend/dist/**}",
+      "excludeFiles": "{**/node_modules/**,**/venv/**,**/.venv/**,**/__pycache__/**}",
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.py?__route=/$1"
+    }
+  ]
+}

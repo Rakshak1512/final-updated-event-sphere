@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm --prefix smart-event-management-system/frontend install && npm --prefix smart-event-management-system/frontend run build",
+  "buildCommand": "node build.js",
   "outputDirectory": "smart-event-management-system/frontend/dist",
   "functions": {
     "api/**/*.py": {
