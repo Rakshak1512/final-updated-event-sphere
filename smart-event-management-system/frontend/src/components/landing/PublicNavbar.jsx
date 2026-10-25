@@ -47,6 +47,7 @@ export default function PublicNavbar({ activeSection = "home", onNavigateSection
 
   return (
     <header
+      className="public-navbar-header"
       style={{
         position: "sticky",
         top: 0,
@@ -56,10 +57,13 @@ export default function PublicNavbar({ activeSection = "home", onNavigateSection
         WebkitBackdropFilter: "blur(20px)",
         borderBottom: "1px solid var(--border-color)",
         boxShadow: "0 4px 20px rgba(0, 0, 0, 0.04)",
+        paddingTop: "max(0px, env(safe-area-inset-top, 0px))",
+        paddingLeft: "max(0px, env(safe-area-inset-left, 0px))",
+        paddingRight: "max(0px, env(safe-area-inset-right, 0px))",
       }}
     >
       <div
-        className="container"
+        className="container public-navbar-container"
         style={{
           display: "flex",
           alignItems: "center",
@@ -195,14 +199,14 @@ export default function PublicNavbar({ activeSection = "home", onNavigateSection
           aria-label="Toggle navigation menu"
           style={{
             display: "none",
-            background: "none",
-            border: "none",
-            fontSize: 24,
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border-color)",
             color: "var(--text-primary)",
-            padding: 6,
+            padding: 0,
+            cursor: "pointer",
           }}
         >
-          {mobileOpen ? <FiX /> : <FiMenu />}
+          {mobileOpen ? <FiX size={22} /> : <FiMenu size={22} />}
         </button>
       </div>
 
@@ -216,9 +220,11 @@ export default function PublicNavbar({ activeSection = "home", onNavigateSection
             transition={{ duration: 0.25, ease: "easeInOut" }}
             className="mobile-drawer"
             style={{
-              overflow: "hidden",
+              overflowY: "auto",
+              maxHeight: "calc(100dvh - 76px - env(safe-area-inset-top, 0px))",
               borderTop: "1px solid var(--border-color)",
               background: "var(--bg-elevated)",
+              paddingBottom: "max(24px, env(safe-area-inset-bottom, 0px))",
             }}
           >
             <div
@@ -298,6 +304,14 @@ export default function PublicNavbar({ activeSection = "home", onNavigateSection
 
       <style>{`
         @media (max-width: 900px) {
+          .public-navbar-header {
+            padding-top: max(6px, env(safe-area-inset-top, 0px)) !important;
+            padding-left: max(6px, env(safe-area-inset-left, 0px)) !important;
+            padding-right: max(6px, env(safe-area-inset-right, 0px)) !important;
+          }
+          .public-navbar-container {
+            height: 66px !important;
+          }
           .desktop-nav-wrap,
           .desktop-actions {
             display: none !important;
@@ -305,6 +319,20 @@ export default function PublicNavbar({ activeSection = "home", onNavigateSection
           .mobile-toggle-btn {
             display: flex !important;
             align-items: center;
+            justify-content: center;
+            width: 44px !important;
+            height: 44px !important;
+            min-width: 44px !important;
+            min-height: 44px !important;
+            border-radius: 12px !important;
+            background: var(--bg-elevated) !important;
+            border: 1px solid var(--border-color) !important;
+            color: var(--text-primary) !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            cursor: pointer;
+          }
+          .mobile-toggle-btn:active {
+            transform: scale(0.94);
           }
         }
       `}</style>

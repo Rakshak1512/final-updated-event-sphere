@@ -403,7 +403,7 @@ img {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: max(24px, calc(env(safe-area-inset-top, 0px) + 20px)) max(16px, env(safe-area-inset-right, 0px)) max(24px, calc(env(safe-area-inset-bottom, 0px) + 20px)) max(16px, env(safe-area-inset-left, 0px));
   background: var(--bg-base);
 }
 .auth-card {
@@ -468,7 +468,7 @@ img {
 }
 @media (max-width: 480px) {
   .auth-shell {
-    padding: 16px 12px;
+    padding: max(16px, calc(env(safe-area-inset-top, 0px) + 16px)) max(12px, env(safe-area-inset-right, 0px)) max(16px, calc(env(safe-area-inset-bottom, 0px) + 16px)) max(12px, env(safe-area-inset-left, 0px));
   }
   .auth-card {
     padding: 24px 14px;

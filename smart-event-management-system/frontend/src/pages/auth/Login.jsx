@@ -189,7 +189,7 @@ export default function Login() {
         />
 
         {/* Floating Theme Switcher */}
-        <div style={{ position: "absolute", top: 24, right: 24, zIndex: 10 }}>
+        <div style={{ position: "absolute", top: "max(20px, calc(env(safe-area-inset-top, 0px) + 16px))", right: "max(20px, calc(env(safe-area-inset-right, 0px) + 16px))", zIndex: 10 }}>
           <ThemeToggle />
         </div>
 
@@ -224,9 +224,11 @@ export default function Login() {
             position: "absolute",
             top: 18,
             left: 18,
-            width: 38,
-            height: 38,
-            borderRadius: 11,
+            width: 40,
+            height: 40,
+            minWidth: 42,
+            minHeight: 42,
+            borderRadius: 12,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -237,7 +239,7 @@ export default function Login() {
             zIndex: 3,
           }}
         >
-          <FiArrowLeft size={17} />
+          <FiArrowLeft size={18} />
         </button>
 
         {/* Header */}
@@ -408,7 +410,7 @@ export default function Login() {
                   <input type="checkbox" checked={form.remember_me} onChange={update("remember_me")} />
                   Remember me
                 </label>
-                <Link to="/forgot-password" style={{ fontSize: 13, color: "#8b5cf6", fontWeight: 600 }}>
+                <Link to="/forgot-password" replace style={{ fontSize: 13, color: "#8b5cf6", fontWeight: 600 }}>
                   Forgot password?
                 </Link>
               </div>

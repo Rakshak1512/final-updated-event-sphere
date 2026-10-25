@@ -1,11 +1,11 @@
 {
   "id": "/",
-  "name": "EventSphere — Smart Event Management System",
+  "name": "EventSphere",
   "short_name": "EventSphere",
   "description": "EventSphere — Plan, Manage, Connect",
   "start_url": "/",
   "scope": "/",
-  "display": "standalone",
+  "display": "minimal-ui",
   "orientation": "portrait-primary",
   "background_color": "#050817",
   "theme_color": "#0f172a",

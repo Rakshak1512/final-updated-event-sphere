@@ -218,19 +218,27 @@ export default function ForgotPassword() {
         />
 
         {/* Top Navigation */}
-        <div style={{ position: "absolute", top: 24, left: 24, zIndex: 10 }}>
+        <div style={{ position: "absolute", top: "max(20px, calc(env(safe-area-inset-top, 0px) + 16px))", left: "max(20px, calc(env(safe-area-inset-left, 0px) + 16px))", zIndex: 10 }}>
           <button
             type="button"
             onClick={() => {
               if (step === "verify") setStep("request");
               else if (step === "reset") setStep("verify");
-              else navigate("/login");
+              else {
+                if (window.history.length > 1) {
+                  navigate(-1);
+                } else {
+                  navigate("/", { replace: true });
+                }
+              }
             }}
             aria-label="Go back"
             title="Go back"
             style={{
-              width: 40,
-              height: 40,
+              width: 42,
+              height: 42,
+              minWidth: 42,
+              minHeight: 42,
               borderRadius: 12,
               display: "flex",
               alignItems: "center",
@@ -245,7 +253,7 @@ export default function ForgotPassword() {
           </button>
         </div>
 
-        <div style={{ position: "absolute", top: 24, right: 24, zIndex: 10 }}>
+        <div style={{ position: "absolute", top: "max(20px, calc(env(safe-area-inset-top, 0px) + 16px))", right: "max(20px, calc(env(safe-area-inset-right, 0px) + 16px))", zIndex: 10 }}>
           <ThemeToggle />
         </div>
 
@@ -628,7 +636,7 @@ export default function ForgotPassword() {
                   fontSize: 14.5,
                   fontWeight: 600,
                 }}
-                onClick={() => navigate("/login")}
+                onClick={() => navigate("/login", { replace: true })}
               >
                 Proceed to Login
               </button>
@@ -638,7 +646,7 @@ export default function ForgotPassword() {
           {/* Footer Link */}
           <p style={{ textAlign: "center", fontSize: 13.5, color: "var(--text-secondary)", marginTop: 24, marginBottom: 0 }}>
             Remembered your password?{" "}
-            <Link to="/login" style={{ color: "#8b5cf6", fontWeight: 600 }}>
+            <Link to="/login" replace style={{ color: "#8b5cf6", fontWeight: 600 }}>
               Back to login
             </Link>
           </p>
