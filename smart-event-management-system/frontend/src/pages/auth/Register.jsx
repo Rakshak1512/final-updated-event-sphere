@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
-import { FiCalendar, FiUpload, FiEye, FiEyeOff } from "react-icons/fi";
+import { FiCalendar, FiUpload, FiEye, FiEyeOff, FiArrowLeft } from "react-icons/fi";
 import ThemeToggle from "../../components/common/ThemeToggle.jsx";
 import PageTransition from "../../components/common/PageTransition.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -153,46 +153,85 @@ export default function Register() {
         className="auth-shell"
         style={{
           position: "relative",
-          minHeight: "100vh",
+          minHeight: "100dvh",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "24px",
-          overflow: "hidden",
+          padding: "max(24px, calc(env(safe-area-inset-top, 0px) + 24px)) max(16px, env(safe-area-inset-right, 0px)) max(40px, calc(env(safe-area-inset-bottom, 0px) + 32px)) max(16px, env(safe-area-inset-left, 0px))",
+          overflowX: "hidden",
+          width: "100%",
+          boxSizing: "border-box",
         }}
       >
-        {/* Ambient Blurred Background Lights */}
+        {/* Ambient Blurred Background Lights (isolated in non-scrolling container) */}
         <div
           aria-hidden
           style={{
             position: "absolute",
-            top: -120,
-            left: -100,
-            width: 480,
-            height: 480,
-            borderRadius: "50%",
-            background: "var(--gradient-primary)",
-            opacity: 0.16,
-            filter: "blur(90px)",
+            inset: 0,
+            overflow: "hidden",
             pointerEvents: "none",
+            zIndex: 0,
           }}
-        />
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            bottom: -100,
-            right: -80,
-            width: 450,
-            height: 450,
-            borderRadius: "50%",
-            background: "rgba(14, 165, 233, 0.14)",
-            filter: "blur(80px)",
-            pointerEvents: "none",
-          }}
-        />
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: -120,
+              left: -100,
+              width: 480,
+              height: 480,
+              borderRadius: "50%",
+              background: "var(--gradient-primary)",
+              opacity: 0.16,
+              filter: "blur(90px)",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              bottom: -100,
+              right: -80,
+              width: 450,
+              height: 450,
+              borderRadius: "50%",
+              background: "rgba(14, 165, 233, 0.14)",
+              filter: "blur(80px)",
+            }}
+          />
+        </div>
 
-        <div style={{ position: "absolute", top: 24, right: 24, zIndex: 10 }}>
+        {/* Top Navigation Controls */}
+        <div style={{ position: "absolute", top: "max(20px, calc(env(safe-area-inset-top, 0px) + 16px))", left: "max(20px, calc(env(safe-area-inset-left, 0px) + 16px))", zIndex: 10 }}>
+          <button
+            type="button"
+            onClick={() => {
+              if (window.history.length > 1) navigate(-1);
+              else navigate("/", { replace: true });
+            }}
+            aria-label="Go back"
+            title="Go back"
+            style={{
+              width: 42,
+              height: 42,
+              minWidth: 42,
+              minHeight: 42,
+              borderRadius: 12,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "var(--bg-glass)",
+              border: "1px solid var(--border-color)",
+              color: "var(--text-secondary)",
+              cursor: "pointer",
+            }}
+          >
+            <FiArrowLeft size={18} />
+          </button>
+        </div>
+
+        <div style={{ position: "absolute", top: "max(20px, calc(env(safe-area-inset-top, 0px) + 16px))", right: "max(20px, calc(env(safe-area-inset-right, 0px) + 16px))", zIndex: 10 }}>
           <ThemeToggle />
         </div>
 
@@ -533,7 +572,7 @@ export default function Register() {
 
           <p style={{ textAlign: "center", fontSize: 13.5, color: "var(--text-secondary)", marginTop: 22 }}>
             Already have an account?{" "}
-            <Link to="/login" style={{ color: "#8b5cf6", fontWeight: 600 }}>
+            <Link to="/login" replace style={{ color: "#8b5cf6", fontWeight: 600 }}>
               Login
             </Link>
           </p>

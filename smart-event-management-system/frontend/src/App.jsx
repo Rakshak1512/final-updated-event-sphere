@@ -5,6 +5,7 @@ import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./components/common/ProtectedRoute.jsx";
 import DashboardLayout from "./components/layout/DashboardLayout.jsx";
 import Loader from "./components/ui/Loader.jsx";
+import PullToRefresh from "./components/common/PullToRefresh.jsx";
 
 // Core landing & auth pages loaded directly for instant initial paint
 import Home from "./pages/landing/Home.jsx";
@@ -46,6 +47,7 @@ const Settings = lazy(() => import("./pages/shared/Settings.jsx"));
 export default function App() {
   return (
     <>
+      <PullToRefresh />
       <Toaster
         position="top-right"
         toastOptions={{

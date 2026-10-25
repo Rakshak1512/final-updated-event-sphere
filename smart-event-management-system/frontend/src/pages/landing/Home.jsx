@@ -53,8 +53,8 @@ const DOMAIN_FEATURES = [
     icon: FiCompass,
     tagline: "Discover, Register, and Track Campus Participation",
     description: "Designed for effortless campus engagement. Students explore upcoming academic fests, register individually or in multi-member teams, manage active QR passes, and view verified digital certificates.",
-    route: "/events",
-    actionLabel: "Explore Events Directory",
+    route: "/login?role=student",
+    actionLabel: "Student Portal Login",
     authRoute: "/student/dashboard",
     features: [
       {
@@ -99,13 +99,13 @@ const DOMAIN_FEATURES = [
     id: "faculty",
     role: "faculty",
     badge: "Academic Organizers",
-    title: "Faculty & Organizer Portal",
+    title: "Faculty Coordinator Login",
     accent: "#6366f1",
     gradient: "linear-gradient(135deg, #6366f1, #8b5cf6)",
     icon: FiPlusSquare,
     tagline: "Publish, Approve, and Oversee Campus Events",
     description: "Equips faculty coordinators and department heads with full event lifecycle management, candidate approval queues, verified participant rosters, and certificate issuance.",
-    route: "/login",
+    route: "/login?role=faculty",
     actionLabel: "Faculty Coordinator Login",
     authRoute: "/faculty/dashboard",
     features: [
@@ -151,14 +151,14 @@ const DOMAIN_FEATURES = [
     id: "volunteer",
     role: "volunteer",
     badge: "Event Ground Operations",
-    title: "Volunteer Operations Portal",
+    title: "Volunteer Login",
     accent: "#10b981",
     gradient: "linear-gradient(135deg, #10b981, #06b6d4)",
     icon: FiCamera,
     tagline: "Camera-Powered QR Ticket Scanning & Gate Check-In",
     description: "A fast, hardware-aware gate terminal for approved event volunteers. Scans attendee QR codes, validates tickets in real time, and logs verified gate attendance.",
-    route: "/login",
-    actionLabel: "Volunteer Portal Access",
+    route: "/login?role=volunteer",
+    actionLabel: "Volunteer Login",
     authRoute: "/volunteer/dashboard",
     features: [
       {
@@ -203,14 +203,14 @@ const DOMAIN_FEATURES = [
     id: "admin",
     role: "admin",
     badge: "Institutional Governance",
-    title: "Admin & Executive Authority",
+    title: "Admin Login",
     accent: "#0ea5e9",
     gradient: "linear-gradient(135deg, #0ea5e9, #6366f1)",
     icon: FiShield,
     tagline: "Executive Oversight, Faculty Clearance, and Compliance Reports",
     description: "Built for Principal and Dean offices to monitor campus-wide metrics, review and authorize faculty organizers, assign event responsibilities, and generate institutional compliance reports.",
-    route: "/login",
-    actionLabel: "Institutional Admin Login",
+    route: "/login?role=admin",
+    actionLabel: "Admin Login",
     authRoute: "/admin/dashboard",
     features: [
       {
@@ -529,39 +529,6 @@ export default function Home() {
                     <FiArrowRight size={15} />
                   </span>
                 </Link>
-              </div>
-
-              {/* 3. EXPLORE EVENTS: Event Discovery Navigation CTA */}
-              <div style={{ position: "relative" }}>
-                <button
-                  type="button"
-                  onClick={() => handleNavigateSection("events")}
-                  className="btn btn-outline"
-                  style={{
-                    position: "relative",
-                    overflow: "hidden",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 9,
-                    padding: "13px 26px",
-                    fontSize: "15px",
-                    fontWeight: 600,
-                    borderRadius: "999px",
-                    background: "rgba(18, 22, 42, 0.55)",
-                    backdropFilter: "blur(16px)",
-                    WebkitBackdropFilter: "blur(16px)",
-                    border: "1.5px solid rgba(14, 165, 233, 0.4)",
-                    color: "var(--text-primary)",
-                    boxShadow: "0 4px 16px rgba(0, 0, 0, 0.12)",
-                    cursor: "pointer",
-                    transition: "border-color 0.25s ease, box-shadow 0.25s ease, color 0.25s ease",
-                  }}
-                >
-                  <span style={{ position: "relative", zIndex: 2 }}>Explore Events</span>
-                  <span style={{ position: "relative", zIndex: 2, display: "inline-flex", color: "#0ea5e9" }}>
-                    <FiCompass size={16} />
-                  </span>
-                </button>
               </div>
             </div>
 
@@ -923,9 +890,9 @@ export default function Home() {
                       <span>Open My Dashboard</span>
                       <FiArrowRight size={15} />
                     </Link>
-                  ) : currentDomain.id === "student" ? (
+                  ) : (
                     <Link
-                      to="/events"
+                      to={currentDomain.route}
                       className="btn btn-primary"
                       style={{
                         padding: "10px 22px",
@@ -939,25 +906,7 @@ export default function Home() {
                         fontSize: 14,
                         fontWeight: 600,
                         boxShadow: `0 6px 20px ${currentDomain.accent}45`,
-                      }}
-                    >
-                      <span>{currentDomain.actionLabel}</span>
-                      <FiArrowRight size={15} />
-                    </Link>
-                  ) : (
-                    <Link
-                      to="/login"
-                      className="btn btn-outline"
-                      style={{
-                        padding: "9px 20px",
-                        borderRadius: 999,
-                        borderColor: `${currentDomain.accent}66`,
-                        color: "var(--text-primary)",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 8,
-                        fontSize: 14,
-                        fontWeight: 600,
+                        textDecoration: "none",
                       }}
                     >
                       <span>{currentDomain.actionLabel}</span>
@@ -1139,6 +1088,30 @@ export default function Home() {
                   >
                     {dom.tagline}
                   </p>
+                  <Link
+                    to={dom.route}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      marginTop: 14,
+                      padding: "8px 14px",
+                      borderRadius: 999,
+                      background: dom.gradient,
+                      color: "#fff",
+                      border: "none",
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                      boxShadow: `0 4px 12px ${dom.accent}35`,
+                      textDecoration: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <span>{dom.actionLabel}</span>
+                    <FiArrowRight size={13} />
+                  </Link>
                 </div>
               );
             })}

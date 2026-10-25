@@ -178,44 +178,50 @@ export default function ForgotPassword() {
         className="auth-shell"
         style={{
           position: "relative",
-          minHeight: "100vh",
+          minHeight: "100dvh",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          padding: "24px 16px",
+          padding: "max(24px, env(safe-area-inset-top, 24px)) max(16px, env(safe-area-inset-right, 16px)) max(32px, env(safe-area-inset-bottom, 32px)) max(16px, env(safe-area-inset-left, 16px))",
           background: "var(--bg-base, #0b0f19)",
-          overflow: "hidden",
         }}
       >
-        {/* Ambient Blurred Background Lights */}
+        {/* Ambient Blurred Background Lights (isolated to prevent scroll clipping) */}
         <div
           aria-hidden
           style={{
             position: "absolute",
-            top: -120,
-            left: "20%",
-            width: 480,
-            height: 480,
-            borderRadius: "50%",
-            background: "rgba(139, 92, 246, 0.16)",
-            filter: "blur(90px)",
+            inset: 0,
+            overflow: "hidden",
             pointerEvents: "none",
+            zIndex: 0,
           }}
-        />
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            bottom: -100,
-            right: "20%",
-            width: 450,
-            height: 450,
-            borderRadius: "50%",
-            background: "rgba(99, 102, 241, 0.14)",
-            filter: "blur(80px)",
-            pointerEvents: "none",
-          }}
-        />
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: -120,
+              left: "20%",
+              width: 480,
+              height: 480,
+              borderRadius: "50%",
+              background: "rgba(139, 92, 246, 0.16)",
+              filter: "blur(90px)",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              bottom: -100,
+              right: "20%",
+              width: 450,
+              height: 450,
+              borderRadius: "50%",
+              background: "rgba(99, 102, 241, 0.14)",
+              filter: "blur(80px)",
+            }}
+          />
+        </div>
 
         {/* Top Navigation */}
         <div style={{ position: "absolute", top: "max(20px, calc(env(safe-area-inset-top, 0px) + 16px))", left: "max(20px, calc(env(safe-area-inset-left, 0px) + 16px))", zIndex: 10 }}>

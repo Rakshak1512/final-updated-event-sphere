@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
@@ -10,12 +10,34 @@ import TestUsersModal from "../../components/auth/TestUsersModal.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { authService } from "../../api/services.js";
 
+const VALID_ROLES = ["student", "faculty", "volunteer", "admin"];
+
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [role, setRole] = useState("student");
+  const getInitialRole = () => {
+    const params = new URLSearchParams(location.search);
+    const qRole = params.get("role")?.toLowerCase();
+    if (qRole && VALID_ROLES.includes(qRole)) return qRole;
+    if (location.state?.role && VALID_ROLES.includes(location.state.role.toLowerCase())) {
+      return location.state.role.toLowerCase();
+    }
+    return "student";
+  };
+
+  const [role, setRole] = useState(getInitialRole);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const qRole = params.get("role")?.toLowerCase();
+    if (qRole && VALID_ROLES.includes(qRole)) {
+      setRole(qRole);
+    } else if (location.state?.role && VALID_ROLES.includes(location.state.role.toLowerCase())) {
+      setRole(location.state.role.toLowerCase());
+    }
+  }, [location.search, location.state]);
 
   // Test users modal state
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
@@ -79,8 +101,10 @@ export default function Login() {
       });
       setIsTestModalOpen(false);
       toast.success(`Welcome back, ${user?.name ? user.name.split(" ")[0] : "User"}!`);
-      const dest = getDashboardDestination(user);
-      navigate(dest, { replace: true });
+      const returnUrl = (location.state?.from?.pathname && location.state.from.pathname !== "/login")
+        ? `${location.state.from.pathname}${location.state.from.search || ""}`
+        : getDashboardDestination(user);
+      navigate(returnUrl, { replace: true });
     } catch (err) {
       if (!err.response) {
         toast.error(err.message || "Login failed. Please try again.");
@@ -120,8 +144,10 @@ export default function Login() {
       };
       const user = await login(payload);
       toast.success(`Welcome back, ${user?.name ? user.name.split(" ")[0] : "User"}!`);
-      const dest = getDashboardDestination(user);
-      navigate(dest, { replace: true });
+      const returnUrl = (location.state?.from?.pathname && location.state.from.pathname !== "/login")
+        ? `${location.state.from.pathname}${location.state.from.search || ""}`
+        : getDashboardDestination(user);
+      navigate(returnUrl, { replace: true });
     } catch (err) {
       const msg = getAuthErrorMessage(err);
       toast.error(msg);
@@ -150,12 +176,15 @@ export default function Login() {
         className="auth-shell"
         style={{
           position: "relative",
-          minHeight: "100vh",
+          minHeight: "100dvh",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "24px",
-          overflow: "hidden",
+          padding: "max(24px, calc(env(safe-area-inset-top, 0px) + 24px)) max(16px, env(safe-area-inset-right, 0px)) max(32px, calc(env(safe-area-inset-bottom, 0px) + 24px)) max(16px, env(safe-area-inset-left, 0px))",
+          overflowX: "hidden",
+          width: "100%",
+          boxSizing: "border-box",
         }}
       >
         {/* Ambient Blurred Background Lights */}
@@ -163,30 +192,37 @@ export default function Login() {
           aria-hidden
           style={{
             position: "absolute",
-            top: -100,
-            left: "20%",
-            width: 450,
-            height: 450,
-            borderRadius: "50%",
-            background: "rgba(139, 92, 246, 0.16)",
-            filter: "blur(80px)",
+            inset: 0,
+            overflow: "hidden",
             pointerEvents: "none",
+            zIndex: 0,
           }}
-        />
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            bottom: -80,
-            right: "20%",
-            width: 400,
-            height: 400,
-            borderRadius: "50%",
-            background: "rgba(99, 102, 241, 0.14)",
-            filter: "blur(90px)",
-            pointerEvents: "none",
-          }}
-        />
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: -100,
+              left: "20%",
+              width: 450,
+              height: 450,
+              borderRadius: "50%",
+              background: "rgba(139, 92, 246, 0.16)",
+              filter: "blur(80px)",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              bottom: -80,
+              right: "20%",
+              width: 400,
+              height: 400,
+              borderRadius: "50%",
+              background: "rgba(99, 102, 241, 0.14)",
+              filter: "blur(90px)",
+            }}
+          />
+        </div>
 
         {/* Floating Theme Switcher */}
         <div style={{ position: "absolute", top: "max(20px, calc(env(safe-area-inset-top, 0px) + 16px))", right: "max(20px, calc(env(safe-area-inset-right, 0px) + 16px))", zIndex: 10 }}>
@@ -301,7 +337,10 @@ export default function Login() {
               <button
                 key={r.id}
                 type="button"
-                onClick={() => setRole(r.id)}
+                onClick={() => {
+                  setRole(r.id);
+                  navigate(`/login?role=${r.id}`, { replace: true });
+                }}
                 className="btn btn-sm"
                 style={{
                   flex: 1,
@@ -423,7 +462,7 @@ export default function Login() {
           {/* Footer link to Register */}
           <div style={{ textAlign: "center", marginTop: 22, fontSize: 13.5, color: "var(--text-secondary)" }}>
             Don't have an account?{" "}
-            <Link to="/register" style={{ color: "#8b5cf6", fontWeight: 600 }}>
+            <Link to="/register" replace style={{ color: "#8b5cf6", fontWeight: 600 }}>
               Register here
             </Link>
           </div>

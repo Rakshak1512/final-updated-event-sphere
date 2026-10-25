@@ -49,12 +49,28 @@ const processQueue = (error, token = null) => {
   pendingQueue = [];
 };
 
+const isAuthBypassUrl = (url = "") => {
+  return (
+    url.includes("/auth/login") ||
+    url.includes("/auth/refresh") ||
+    url.includes("/auth/register") ||
+    url.includes("/auth/verify-email") ||
+    url.includes("/auth/forgot-password") ||
+    url.includes("/auth/reset-password")
+  );
+};
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url.includes("/auth/")) {
+    if (
+      error.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      !isAuthBypassUrl(originalRequest.url || "")
+    ) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           pendingQueue.push({ resolve, reject });
@@ -83,7 +99,6 @@ api.interceptors.response.use(
         localStorage.removeItem("sems-access-token");
         localStorage.removeItem("sems-refresh-token");
         localStorage.removeItem("sems-user");
-        window.location.href = "/login";
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

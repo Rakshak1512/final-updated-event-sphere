@@ -27,10 +27,11 @@ export function AuthProvider({ children }) {
     }
   });
 
-  // If both token and user profile are already cached in localStorage, start with loading=false
+  // If a valid session is cached in localStorage, start with loading=false
   // so protected routes render instantly (0ms) without waiting for network roundtrips.
+  // If tokens exist but user profile is missing, start with loading=true.
   const [loading, setLoading] = useState(() => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("sems-access-token") : null;
+    const token = typeof window !== "undefined" ? (localStorage.getItem("sems-access-token") || localStorage.getItem("sems-refresh-token")) : null;
     const stored = typeof window !== "undefined" ? localStorage.getItem("sems-user") : null;
     return Boolean(token && !stored);
   });
@@ -38,11 +39,14 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let isMounted = true;
     const bootstrap = async () => {
-      const token = localStorage.getItem("sems-access-token");
-      if (!token) {
+      const accessToken = localStorage.getItem("sems-access-token");
+      const refreshToken = localStorage.getItem("sems-refresh-token");
+
+      if (!accessToken && !refreshToken) {
         if (isMounted) setLoading(false);
         return;
       }
+
       try {
         const { data } = await api.get("/auth/me");
         if (isMounted) {
@@ -50,7 +54,7 @@ export function AuthProvider({ children }) {
           localStorage.setItem("sems-user", JSON.stringify(data));
         }
       } catch (err) {
-        // If 401 Unauthorized, token is expired/invalid
+        // Only if 401 occurs after token refresh attempts have failed
         if (err.response?.status === 401 && isMounted) {
           localStorage.removeItem("sems-access-token");
           localStorage.removeItem("sems-refresh-token");
@@ -60,7 +64,6 @@ export function AuthProvider({ children }) {
       } finally {
         if (isMounted) setLoading(false);
       }
-      setLoading(false);
     };
     bootstrap();
     return () => {
