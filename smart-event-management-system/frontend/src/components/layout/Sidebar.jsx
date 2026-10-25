@@ -94,23 +94,18 @@ export default function Sidebar({ items, role, open, onClose }) {
               letterSpacing: "-0.02em",
             }}
           >
-            <motion.span
+            <motion.img
+              src="/eventsphere-emblem.png"
+              alt="EventSphere Logo"
               whileHover={{ scale: 1.08, rotate: 6 }}
               whileTap={{ scale: 0.94 }}
               style={{
                 width: 36,
                 height: 36,
-                borderRadius: 11,
-                background: "var(--gradient-primary)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#fff",
-                boxShadow: "0 6px 16px rgba(139, 92, 246, 0.45)",
+                objectFit: "contain",
+                filter: "drop-shadow(0 4px 12px rgba(139, 92, 246, 0.45))",
               }}
-            >
-              <FiCalendar size={18} />
-            </motion.span>
+            />
             <span>
               Event<span className="text-gradient">Sphere</span>
             </span>

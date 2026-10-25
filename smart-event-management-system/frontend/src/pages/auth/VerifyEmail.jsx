@@ -226,21 +226,16 @@ export default function VerifyEmail() {
               color: "var(--text-primary, #ffffff)",
             }}
           >
-            <span
+            <img
+              src="/eventsphere-emblem.png"
+              alt="EventSphere Logo"
               style={{
                 width: 38,
                 height: 38,
-                borderRadius: 12,
-                background: "linear-gradient(135deg, #8b5cf6, #3b82f6)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#fff",
-                boxShadow: "0 4px 12px rgba(139, 92, 246, 0.35)",
+                objectFit: "contain",
+                filter: "drop-shadow(0 4px 12px rgba(139, 92, 246, 0.4))",
               }}
-            >
-              <FiCalendar size={18} />
-            </span>
+            />
             Event<span style={{ color: "#8b5cf6" }}>Sphere</span>
           </Link>
 

@@ -295,20 +295,16 @@ export default function ForgotPassword() {
                 marginBottom: 16,
               }}
             >
-              <span
+              <img
+                src="/eventsphere-emblem.png"
+                alt="EventSphere Logo"
                 style={{
                   width: 38,
                   height: 38,
-                  borderRadius: 12,
-                  background: "var(--gradient-primary)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#fff",
+                  objectFit: "contain",
+                  filter: "drop-shadow(0 4px 12px rgba(139, 92, 246, 0.4))",
                 }}
-              >
-                <FiCalendar size={18} />
-              </span>
+              />
               Event<span className="text-gradient">Sphere</span>
             </Link>
 

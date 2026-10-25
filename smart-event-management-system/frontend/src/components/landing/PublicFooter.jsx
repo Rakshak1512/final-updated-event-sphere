@@ -7,9 +7,16 @@ export default function PublicFooter() {
       <div className="container footer-grid" style={{ padding: "56px 24px 28px", display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1.2fr", gap: 40 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 800, fontSize: 18, marginBottom: 14 }}>
-            <span style={{ width: 36, height: 36, borderRadius: 10, background: "var(--gradient-primary)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
-              <FiCalendar />
-            </span>
+            <img
+              src="/eventsphere-emblem.png"
+              alt="EventSphere Logo"
+              style={{
+                width: 36,
+                height: 36,
+                objectFit: "contain",
+                filter: "drop-shadow(0 4px 12px rgba(139, 92, 246, 0.4))",
+              }}
+            />
             Event<span className="text-gradient">Sphere</span>
           </div>
           <p style={{ color: "var(--text-secondary)", fontSize: 14, maxWidth: 320, lineHeight: 1.6 }}>

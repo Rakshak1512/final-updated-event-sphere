@@ -85,23 +85,18 @@ export default function PublicNavbar({ activeSection = "home", onNavigateSection
             letterSpacing: "-0.02em",
           }}
         >
-          <motion.span
-            whileHover={{ scale: 1.06, rotate: 5 }}
+          <motion.img
+            src="/eventsphere-emblem.png"
+            alt="EventSphere Logo"
+            whileHover={{ scale: 1.08, rotate: 4 }}
             whileTap={{ scale: 0.94 }}
             style={{
               width: 40,
               height: 40,
-              borderRadius: 13,
-              background: "var(--gradient-primary)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#fff",
-              boxShadow: "0 6px 18px rgba(139, 92, 246, 0.4)",
+              objectFit: "contain",
+              filter: "drop-shadow(0 4px 14px rgba(139, 92, 246, 0.45))",
             }}
-          >
-            <FiCalendar size={20} />
-          </motion.span>
+          />
           <span>
             Event<span className="text-gradient">Sphere</span>
           </span>
