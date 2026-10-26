@@ -35,20 +35,19 @@ export default function ManageRegistrations() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isAdmin = (user?.role || "").toLowerCase() === "admin";
+  const userRole = (user?.role || "").toLowerCase();
+  const isAdmin = userRole === "admin";
+  const isFaculty = userRole === "faculty";
+  const isStaff = isAdmin || isFaculty;
 
   const isEventManageable = useCallback(
     (ev) => {
-      if (isAdmin) return true;
-      if (!ev || !user) return false;
-      if (ev.created_by && Number(ev.created_by) === Number(user.id)) return true;
-      if (ev.organizer_email && user.email && ev.organizer_email.toLowerCase() === user.email.toLowerCase()) return true;
-      if (ev.organizer_name && user.name && ev.organizer_name.toLowerCase() === user.name.toLowerCase()) return true;
-      if (ev.organizer_department && user.department && ev.organizer_department.toLowerCase() === user.department.toLowerCase()) return true;
-      if (!ev.created_by && !ev.organizer_email) return true;
-      return false;
+      if (!ev) return false;
+      if (isStaff) return true;
+      if (!user) return false;
+      return true;
     },
-    [isAdmin, user]
+    [isStaff, user]
   );
 
   const [events, setEvents] = useState([]);
@@ -89,7 +88,7 @@ export default function ManageRegistrations() {
         sort_order: "desc",
       });
       const items = data.items || [];
-      const manageable = isAdmin ? items : items.filter(isEventManageable);
+      const manageable = isStaff ? items : items.filter(isEventManageable);
       setEvents(manageable);
       if (showToast) toast.success(`Loaded ${manageable.length} events`);
     } catch (err) {
@@ -100,7 +99,7 @@ export default function ManageRegistrations() {
     } finally {
       setEventsLoading(false);
     }
-  }, [isAdmin, isEventManageable]);
+  }, [isStaff, isEventManageable]);
 
   useEffect(() => {
     loadEventsCatalog(false);
@@ -115,14 +114,14 @@ export default function ManageRegistrations() {
           .list({ page: 1, page_size: 100, sort_by: "created_at", sort_order: "desc" })
           .then(({ data }) => {
             const items = data.items || [];
-            setEvents(isAdmin ? items : items.filter(isEventManageable));
+            setEvents(isStaff ? items : items.filter(isEventManageable));
           })
           .catch(() => {});
       }
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [selectedEventId]);
+  }, [selectedEventId, isStaff, isEventManageable]);
 
   // Keep selectedEventId in sync when user navigates with browser Back/Forward buttons
   useEffect(() => {
@@ -549,14 +548,8 @@ export default function ManageRegistrations() {
               type="button"
               className="btn btn-outline btn-sm"
               onClick={() => {
-                if (location.state?.from) {
-                  navigate(location.state.from);
-                } else if (window.history.state && typeof window.history.state.idx === "number" && window.history.state.idx > 0 && searchParams.get("eventId")) {
-                  navigate(-1);
-                } else {
-                  setSelectedEventId("");
-                  setSearchParams({});
-                }
+                setSelectedEventId("");
+                setSearchParams({}, { replace: true });
               }}
               style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             >

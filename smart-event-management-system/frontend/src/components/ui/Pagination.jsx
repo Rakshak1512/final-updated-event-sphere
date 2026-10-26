@@ -12,16 +12,19 @@ export default function Pagination({ page, pageSize, total, onPageChange }) {
   return (
     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, marginTop: 28 }}>
       <button
+        type="button"
         className="btn btn-outline btn-sm"
         disabled={page <= 1}
         onClick={() => onPageChange(page - 1)}
         aria-label="Previous page"
+        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
       >
-        <FiChevronLeft />
+        <FiChevronLeft /> Prev
       </button>
       {pages.map((p) => (
         <button
           key={p}
+          type="button"
           onClick={() => onPageChange(p)}
           className="btn btn-sm"
           style={{
@@ -35,12 +38,14 @@ export default function Pagination({ page, pageSize, total, onPageChange }) {
         </button>
       ))}
       <button
+        type="button"
         className="btn btn-outline btn-sm"
         disabled={page >= totalPages}
         onClick={() => onPageChange(page + 1)}
         aria-label="Next page"
+        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
       >
-        <FiChevronRight />
+        Next <FiChevronRight />
       </button>
     </div>
   );

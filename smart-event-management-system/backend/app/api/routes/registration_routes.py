@@ -294,34 +294,10 @@ def check_event_management_access(event, user: User) -> bool:
     if not event or not user:
         return False
     user_role_val = user.role.value if hasattr(user.role, "value") else str(user.role).lower()
-    if user_role_val == "admin":
+    if user_role_val in ("admin", "faculty"):
         return True
-    if user_role_val == "faculty":
-        # 1. Created by this faculty member
-        if getattr(event, "created_by", None) is not None:
-            try:
-                if int(event.created_by) == int(user.id):
-                    return True
-            except (ValueError, TypeError):
-                if str(event.created_by) == str(user.id):
-                    return True
-        # 2. Organizer email matches faculty email
-        if getattr(event, "organizer_email", None) and user.email:
-            if event.organizer_email.strip().lower() == user.email.strip().lower():
-                return True
-        # 3. Organizer name matches faculty name
-        if getattr(event, "organizer_name", None) and user.name:
-            if event.organizer_name.strip().lower() == user.name.strip().lower():
-                return True
-        # 4. Department match (if both specify department)
-        if getattr(event, "organizer_department", None) and getattr(user, "department", None):
-            if event.organizer_department.strip().lower() == user.department.strip().lower():
-                return True
-        # 5. Legacy/unassigned events without creator
-        if not getattr(event, "created_by", None) and not getattr(event, "organizer_email", None):
-            return True
-        return False
     return False
+
 
 
 @router.get("/event/{event_id}", response_model=list[RegistrationOut])

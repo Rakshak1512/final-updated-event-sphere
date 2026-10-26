@@ -39,20 +39,19 @@ export default function FacultyRegistrations() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isAdmin = (user?.role || "").toLowerCase() === "admin";
+  const userRole = (user?.role || "").toLowerCase();
+  const isAdmin = userRole === "admin";
+  const isFaculty = userRole === "faculty";
+  const isStaff = isAdmin || isFaculty;
 
   const isEventManageable = useCallback(
     (ev) => {
-      if (isAdmin) return true;
-      if (!ev || !user) return false;
-      if (ev.created_by && Number(ev.created_by) === Number(user.id)) return true;
-      if (ev.organizer_email && user.email && ev.organizer_email.toLowerCase() === user.email.toLowerCase()) return true;
-      if (ev.organizer_name && user.name && ev.organizer_name.toLowerCase() === user.name.toLowerCase()) return true;
-      if (ev.organizer_department && user.department && ev.organizer_department.toLowerCase() === user.department.toLowerCase()) return true;
-      if (!ev.created_by && !ev.organizer_email) return true;
-      return false;
+      if (!ev) return false;
+      if (isStaff) return true;
+      if (!user) return false;
+      return true;
     },
-    [isAdmin, user]
+    [isStaff, user]
   );
 
   const [events, setEvents] = useState([]);
@@ -65,6 +64,17 @@ export default function FacultyRegistrations() {
   const [selectedEventId, setSelectedEventId] = useState(
     searchParams.get("eventId") || (location.state?.eventId ? String(location.state.eventId) : "")
   );
+
+  // Keep selectedEventId synchronized when searchParams changes (e.g. browser back/forward, link navigation)
+  useEffect(() => {
+    const qId = searchParams.get("eventId") || "";
+    if (qId !== selectedEventId) {
+      setSelectedEventId(qId);
+      if (!qId) {
+        setSelectedBranch("all");
+      }
+    }
+  }, [searchParams]);
 
   // Event Registrations & Branch Stats State
   const [regs, setRegs] = useState([]);
@@ -108,7 +118,7 @@ export default function FacultyRegistrations() {
         sort_order: "desc",
       });
       const items = data.items || [];
-      const manageable = isAdmin ? items : items.filter(isEventManageable);
+      const manageable = isStaff ? items : items.filter(isEventManageable);
       setEvents(manageable);
       if (showToast) toast.success(`Loaded ${manageable.length} events`);
     } catch (err) {
@@ -119,7 +129,7 @@ export default function FacultyRegistrations() {
     } finally {
       setEventsLoading(false);
     }
-  }, []);
+  }, [isStaff, isEventManageable]);
 
   useEffect(() => {
     loadEventsCatalog(false);
@@ -134,22 +144,28 @@ export default function FacultyRegistrations() {
           .list({ page: 1, page_size: 100, sort_by: "created_at", sort_order: "desc" })
           .then(({ data }) => {
             const items = data.items || [];
-            setEvents(isAdmin ? items : items.filter(isEventManageable));
+            setEvents(isStaff ? items : items.filter(isEventManageable));
           })
           .catch(() => {});
       }
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [selectedEventId]);
+  }, [selectedEventId, isStaff, isEventManageable]);
 
   // Sync selectedEventId & branch with URL search params
   useEffect(() => {
-    const params = {};
-    if (selectedEventId) params.eventId = selectedEventId;
-    if (selectedBranch && selectedBranch !== "all") params.branch = selectedBranch;
-    setSearchParams(params, { replace: true });
-  }, [selectedEventId, selectedBranch, setSearchParams]);
+    const currentQ = searchParams.get("eventId") || "";
+    const currentBranch = searchParams.get("branch") || "all";
+    if (selectedEventId && (currentQ !== selectedEventId || (selectedBranch !== "all" && currentBranch !== selectedBranch))) {
+      const params = {};
+      params.eventId = selectedEventId;
+      if (selectedBranch && selectedBranch !== "all") params.branch = selectedBranch;
+      setSearchParams(params, { replace: true });
+    } else if (!selectedEventId && currentQ) {
+      setSearchParams({}, { replace: true });
+    }
+  }, [selectedEventId, selectedBranch, searchParams, setSearchParams]);
 
   // Load Registrations & Branch Stats for Selected Event
   const loadEventRegistrations = useCallback(
@@ -576,7 +592,10 @@ export default function FacultyRegistrations() {
                       cursor: "pointer",
                       border: "1.5px solid rgba(139, 92, 246, 0.25)",
                     }}
-                    onClick={() => setSelectedEventId(String(ev.id))}
+                    onClick={() => {
+                      setSelectedEventId(String(ev.id));
+                      setSearchParams({ eventId: String(ev.id) }, { replace: true });
+                    }}
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                       <span className="badge badge-info">{ev.category || "Campus Event"}</span>
@@ -647,6 +666,7 @@ export default function FacultyRegistrations() {
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedEventId(String(ev.id));
+                        setSearchParams({ eventId: String(ev.id) }, { replace: true });
                       }}
                     >
                       <FiUserCheck size={14} /> Manage Registrations
@@ -677,14 +697,9 @@ export default function FacultyRegistrations() {
               type="button"
               className="btn btn-outline btn-sm"
               onClick={() => {
-                if (location.state?.from) {
-                  navigate(location.state.from);
-                } else if (window.history.state && typeof window.history.state.idx === "number" && window.history.state.idx > 0 && searchParams.get("eventId")) {
-                  navigate(-1);
-                } else {
-                  setSelectedEventId("");
-                  setSelectedBranch("all");
-                }
+                setSelectedEventId("");
+                setSelectedBranch("all");
+                setSearchParams({}, { replace: true });
               }}
               style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             >
@@ -698,8 +713,10 @@ export default function FacultyRegistrations() {
                 style={{ minWidth: 240, maxWidth: 360, fontSize: 13 }}
                 value={selectedEventId}
                 onChange={(e) => {
-                  setSelectedEventId(e.target.value);
+                  const nextId = e.target.value;
+                  setSelectedEventId(nextId);
                   setSelectedBranch("all");
+                  setSearchParams({ eventId: nextId }, { replace: true });
                 }}
               >
                 {events.map((ev) => (
@@ -1588,7 +1605,10 @@ export default function FacultyRegistrations() {
             page={currentPage}
             pageSize={pageSize}
             total={filteredRegs.length}
-            onPageChange={setCurrentPage}
+            onPageChange={(p) => {
+              setCurrentPage(p);
+              scrollToRoster();
+            }}
           />
         </div>
       )}
