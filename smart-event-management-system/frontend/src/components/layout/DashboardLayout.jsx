@@ -52,6 +52,7 @@ const adminItems = (base) => [
   { to: `${base}/faculty`, label: "Faculty Directory", icon: FiUsers },
   { to: `${base}/assignments`, label: "Work Assignments", icon: FiCheckSquare },
   { to: `${base}/events`, label: "Events", icon: FiCalendar },
+  { to: `${base}/registrations`, label: "Manage Registrations", icon: FiClipboard },
   { to: `${base}/reports`, label: "Reports & Exports", icon: FiFileText },
   { to: `${base}/notifications`, label: "Notifications", icon: FiBell },
   { to: `${base}/profile`, label: "Profile", icon: FiUser },

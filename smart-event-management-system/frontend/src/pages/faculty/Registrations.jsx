@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   FiCheck,
@@ -35,6 +35,7 @@ import { generateCustomReportPDF } from "../../utils/pdfReportGenerator.js";
 export default function FacultyRegistrations() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [events, setEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
@@ -667,12 +668,18 @@ export default function FacultyRegistrations() {
               type="button"
               className="btn btn-outline btn-sm"
               onClick={() => {
-                setSelectedEventId("");
-                setSelectedBranch("all");
+                if (location.state?.from) {
+                  navigate(location.state.from);
+                } else if (window.history.state && typeof window.history.state.idx === "number" && window.history.state.idx > 0 && searchParams.get("eventId")) {
+                  navigate(-1);
+                } else {
+                  setSelectedEventId("");
+                  setSelectedBranch("all");
+                }
               }}
               style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             >
-              <FiArrowLeft size={14} /> Back to All Events
+              <FiArrowLeft size={14} /> Back to Events
             </button>
 
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>

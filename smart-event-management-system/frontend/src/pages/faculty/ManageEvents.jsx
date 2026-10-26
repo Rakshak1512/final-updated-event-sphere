@@ -25,6 +25,7 @@ import EventPosterDesigner from "../../components/events/EventPosterDesigner.jsx
 import EventReportModal from "../../components/events/EventReportModal.jsx";
 import { eventService } from "../../api/services.js";
 import { fileUrl, formatDate } from "../../utils/format.js";
+import { useAuth } from "../../context/AuthContext.jsx";
 
 const categories = ["Technical", "Cultural", "Sports", "Workshop", "Seminar", "Hackathon", "Other"];
 
@@ -43,6 +44,8 @@ const emptyForm = {
 };
 
 export default function ManageEvents() {
+  const { user } = useAuth();
+  const regBasePath = user?.role === "admin" ? "/admin/registrations" : "/faculty/registrations";
   const [events, setEvents] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -325,8 +328,14 @@ export default function ManageEvents() {
                     <button className="btn btn-outline btn-sm" title="View Edit History" onClick={() => openHistory(ev)}>
                       <FiClock size={13} /> History
                     </button>
-                    <Link to="/faculty/registrations" state={{ eventId: ev.id }} className="btn btn-outline btn-sm">
-                      <FiUsers size={13} /> Regs
+                    <Link
+                      to={`${regBasePath}?eventId=${ev.id}`}
+                      state={{ eventId: ev.id, from: user?.role === "admin" ? "/admin/events" : "/faculty/events" }}
+                      className="btn btn-outline btn-sm"
+                      title="Manage Event Registrations & Attendee Roster"
+                      style={{ color: "#38bdf8", borderColor: "rgba(56, 189, 248, 0.4)" }}
+                    >
+                      <FiUsers size={13} /> Manage Registrations
                     </Link>
                     <button
                       className="btn btn-sm"

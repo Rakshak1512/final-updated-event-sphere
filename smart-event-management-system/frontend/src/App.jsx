@@ -126,6 +126,8 @@ export default function App() {
             <Route path="assignments" element={<AdminAssignments />} />
             <Route path="events" element={<ManageEvents />} />
             <Route path="events/:id" element={<EventDetail embedded={true} />} />
+            <Route path="registrations" element={<FacultyRegistrations />} />
+            <Route path="registration-reports" element={<ManageRegistrations />} />
             <Route path="reports" element={<AdminReports />} />
             <Route path="notifications" element={<Notifications />} />
             <Route path="profile" element={<Profile />} />

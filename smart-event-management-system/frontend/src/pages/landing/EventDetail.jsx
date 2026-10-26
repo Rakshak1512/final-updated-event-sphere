@@ -410,11 +410,19 @@ export default function EventDetail({ embedded = false }) {
                   <FiFileText size={16} /> View Review Report
                 </button>
                 <Link
+                  to={`${user.role === "admin" ? "/admin/registrations" : "/faculty/registrations"}?eventId=${event.id}`}
+                  state={{ eventId: event.id, from: location.pathname }}
+                  className="btn btn-outline"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+                >
+                  <FiUsers size={16} /> Manage Registrations
+                </Link>
+                <Link
                   to={user.role === "faculty" ? "/faculty/events" : "/admin/events"}
                   className="btn btn-outline"
                   style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
                 >
-                  Manage All Events
+                  All Events
                 </Link>
               </div>
             ) : (

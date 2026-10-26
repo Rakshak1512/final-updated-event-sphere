@@ -21,9 +21,10 @@ export default function PublicNavbar({ activeSection = "home", onNavigateSection
   const isLandingPage = location.pathname === "/" || location.pathname === "";
 
   const getDashboardUrl = (role) => {
-    if (role === "admin") return "/admin/dashboard";
-    if (role === "faculty") return "/faculty/dashboard";
-    if (role === "volunteer") return "/volunteer/dashboard";
+    const r = (role || "").trim().toLowerCase();
+    if (r === "admin") return "/admin/dashboard";
+    if (r === "faculty") return "/faculty/dashboard";
+    if (r === "volunteer") return "/volunteer/dashboard";
     return "/student/dashboard";
   };
 
