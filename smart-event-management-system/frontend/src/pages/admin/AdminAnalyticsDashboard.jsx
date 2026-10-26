@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
+import BackButton from "../../components/common/BackButton.jsx";
 import {
   FiUsers,
   FiCalendar,
@@ -484,6 +485,11 @@ export default function AdminAnalyticsDashboard({ embedded = false }) {
 
   return (
     <Container>
+      {!embedded && (
+        <div style={{ marginBottom: 16 }}>
+          <BackButton fallback="/admin/dashboard" label="Back to Dashboard" />
+        </div>
+      )}
       {/* Dashboard Top Header */}
       <div style={{ marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
         <div>

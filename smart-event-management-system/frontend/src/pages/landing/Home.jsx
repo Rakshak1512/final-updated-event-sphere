@@ -125,7 +125,7 @@ const DOMAIN_FEATURES = [
         icon: FiUsers,
         title: "Live Participant Rosters",
         badge: "Real-Time Sync",
-        text: "Real-time participant rosters with instant search, verified check-in status, and 1-click CSV attendance exports.",
+        text: "Real-time participant rosters with instant search, verified check-in status, and 1-click official PDF attendance reports.",
       },
       {
         icon: FiUploadCloud,

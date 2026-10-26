@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   FiRefreshCw,
@@ -33,6 +33,7 @@ import { useAuth } from "../../context/AuthContext.jsx";
 export default function ManageRegistrations() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = (user?.role || "").toLowerCase() === "admin";
 
@@ -547,7 +548,16 @@ export default function ManageRegistrations() {
             <button
               type="button"
               className="btn btn-outline btn-sm"
-              onClick={() => setSelectedEventId("")}
+              onClick={() => {
+                if (location.state?.from) {
+                  navigate(location.state.from);
+                } else if (window.history.state && typeof window.history.state.idx === "number" && window.history.state.idx > 0 && searchParams.get("eventId")) {
+                  navigate(-1);
+                } else {
+                  setSelectedEventId("");
+                  setSearchParams({});
+                }
+              }}
               style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             >
               <FiArrowLeft size={14} /> Back to All Events

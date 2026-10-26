@@ -23,7 +23,6 @@ import {
 } from "../../api/services.js";
 import { formatDate } from "../../utils/format.js";
 import { generateCustomReportPDF } from "../../utils/pdfReportGenerator.js";
-import { exportToCSV } from "../../utils/exportUtils.js";
 
 export default function AdminReports() {
   const [downloading, setDownloading] = useState({});
@@ -543,29 +542,6 @@ export default function AdminReports() {
     }
   };
 
-  // Quick Direct CSV / Excel Download Helper
-  const handleQuickDownloadCSV = async (reportKey, fetchFn, defaultTitle) => {
-    setDownloading((prev) => ({ ...prev, [`${reportKey}_csv`]: true }));
-    try {
-      const data = await fetchFn({
-        selectedColumns: (reportCards.find((r) => r.key === reportKey)?.availableColumns || []).map((c) => c.key),
-        selectedEventId: "all",
-        statusFilter: "all",
-        sortBy: "",
-        sortOrder: "asc",
-        includeSummary: true,
-      });
-
-      const safeFilename = `EventSphere_${defaultTitle.replace(/[^a-zA-Z0-9_-]/g, "_")}_${new Date().toISOString().split("T")[0]}.csv`;
-      exportToCSV(safeFilename, data.headers || [], data.rows || []);
-      toast.success(`${defaultTitle} downloaded as CSV / Excel!`);
-    } catch (err) {
-      console.error("Quick CSV export error:", err);
-      toast.error("Failed to generate CSV / Excel report.");
-    } finally {
-      setDownloading((prev) => ({ ...prev, [`${reportKey}_csv`]: false }));
-    }
-  };
 
   const reportCards = [
     {
@@ -762,13 +738,13 @@ export default function AdminReports() {
               {rc.desc}
             </p>
 
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               {/* Primary Action: Configure & Preview */}
               <button
                 type="button"
                 className="btn btn-primary btn-sm"
                 style={{
-                  flex: "1 1 120px",
+                  flex: "1 1 auto",
                   justifyContent: "center",
                   gap: 6,
                   fontWeight: 700,
@@ -776,7 +752,7 @@ export default function AdminReports() {
                 }}
                 onClick={() => setActiveConfigReport(rc)}
               >
-                <FiSliders size={14} /> Configure
+                <FiSliders size={14} /> Configure & Preview
               </button>
 
               {/* Quick Direct PDF Download */}
@@ -784,7 +760,7 @@ export default function AdminReports() {
                 type="button"
                 className="btn btn-outline btn-sm"
                 style={{
-                  padding: "0 10px",
+                  padding: "0 12px",
                   borderRadius: 10,
                   display: "flex",
                   alignItems: "center",
@@ -792,31 +768,11 @@ export default function AdminReports() {
                   fontWeight: 600,
                   fontSize: 12,
                 }}
-                title="Quick Download Standard PDF Document"
+                title="Quick Download Standard Official PDF Document"
                 disabled={downloading[rc.key]}
                 onClick={() => handleQuickDownload(rc.key, rc.fetchDataFn, rc.defaultTitle, rc.defaultSubtitle)}
               >
-                <FiFileText size={13} /> PDF
-              </button>
-
-              {/* Quick Direct CSV Download */}
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                style={{
-                  padding: "0 10px",
-                  borderRadius: 10,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  fontWeight: 600,
-                  fontSize: 12,
-                }}
-                title="Quick Download CSV / Excel Spreadsheet"
-                disabled={downloading[`${rc.key}_csv`]}
-                onClick={() => handleQuickDownloadCSV(rc.key, rc.fetchDataFn, rc.defaultTitle)}
-              >
-                <FiDownload size={13} /> CSV
+                <FiFileText size={13} /> {downloading[rc.key] ? "Generating..." : "Quick PDF"}
               </button>
             </div>
           </motion.div>

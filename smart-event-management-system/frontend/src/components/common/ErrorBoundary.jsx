@@ -137,7 +137,18 @@ export default class ErrorBoundary extends React.Component {
                 className="btn btn-outline"
                 onClick={() => {
                   this.handleReset();
-                  window.location.href = "/";
+                  let targetHome = "/";
+                  try {
+                    const raw = localStorage.getItem("eventsphere_user");
+                    if (raw) {
+                      const u = JSON.parse(raw);
+                      const r = String(u.role || "").toLowerCase();
+                      if (["student", "faculty", "admin", "volunteer"].includes(r)) {
+                        targetHome = `/${r}/dashboard`;
+                      }
+                    }
+                  } catch {}
+                  window.location.href = targetHome;
                 }}
                 style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
               >

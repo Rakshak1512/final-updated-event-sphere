@@ -18,7 +18,6 @@ import {
 import toast from "react-hot-toast";
 import Modal from "../ui/Modal.jsx";
 import { generateCustomReportPDF } from "../../utils/pdfReportGenerator.js";
-import { exportToCSV } from "../../utils/exportUtils.js";
 
 /**
  * Reusable Report Configuration and Live Preview Modal
@@ -188,27 +187,6 @@ export default function ReportConfigModal({
     }
   };
 
-  // Trigger CSV / Excel Generation
-  const handleDownloadCSV = async () => {
-    setDownloading(true);
-    try {
-      let data = previewData;
-      if (!data) {
-        data = await loadReportData();
-      }
-      if (!data) return;
-
-      const safeFilename = `EventSphere_${title.replace(/[^a-zA-Z0-9_-]/g, "_")}_${new Date().toISOString().split("T")[0]}.csv`;
-      exportToCSV(safeFilename, data.headers || [], data.rows || []);
-      toast.success("CSV / Excel spreadsheet downloaded successfully!");
-      onClose();
-    } catch (err) {
-      console.error("Failed to generate CSV:", err);
-      toast.error("Failed to generate CSV / Excel report.");
-    } finally {
-      setDownloading(false);
-    }
-  };
 
   return (
     <Modal open={open} onClose={onClose} title="Configure & Generate Report" width={780}>
@@ -674,7 +652,7 @@ export default function ReportConfigModal({
           }}
         >
           <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            Formats: High-Resolution PDF & Excel-Compatible CSV
+            Format: Official High-Resolution PDF Document
           </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -698,24 +676,6 @@ export default function ReportConfigModal({
                 <FiFilter size={14} /> Edit Filters
               </button>
             )}
-
-            <button
-              type="button"
-              onClick={handleDownloadCSV}
-              disabled={downloading || loadingData}
-              className="btn btn-outline"
-              style={{
-                padding: "9px 18px",
-                fontSize: 13,
-                fontWeight: 700,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-              title="Download structured spreadsheet in CSV / Excel format"
-            >
-              <FiDownload size={14} /> {downloading ? "Exporting..." : "Download CSV (Excel)"}
-            </button>
 
             <button
               type="button"

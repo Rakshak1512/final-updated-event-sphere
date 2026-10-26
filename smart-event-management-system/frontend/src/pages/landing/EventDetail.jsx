@@ -28,6 +28,7 @@ import { useRealtime } from "../../context/RealtimeContext.jsx";
 import { fileUrl, formatDate } from "../../utils/format.js";
 import EventImage from "../../components/common/EventImage.jsx";
 import QRCodeDisplay from "../../components/common/QRCodeDisplay.jsx";
+import BackButton from "../../components/common/BackButton.jsx";
 import EventReportModal from "../../components/events/EventReportModal.jsx";
 
 export default function EventDetail({ embedded = false }) {
@@ -238,23 +239,13 @@ export default function EventDetail({ embedded = false }) {
       ? "/volunteer/events"
       : "/events";
 
-  const handleBackNavigation = (e) => {
-    if (window.history.state && typeof window.history.state.idx === "number" && window.history.state.idx > 0) {
-      e.preventDefault();
-      navigate(-1);
-    }
-  };
-
   const content = (
     <>
-      <Link
-        to={backLink}
-        onClick={handleBackNavigation}
-        className="btn btn-outline btn-sm"
-        style={{ marginBottom: 24, width: "fit-content", display: "inline-flex", alignItems: "center", gap: 8 }}
-      >
-        <FiArrowLeft /> Back to events
-      </Link>
+      <BackButton
+        fallback={backLink}
+        label="Back to events"
+        style={{ marginBottom: 24, width: "fit-content" }}
+      />
 
       {loading ? (
         <SkeletonCard />

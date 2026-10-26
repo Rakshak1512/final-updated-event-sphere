@@ -23,6 +23,7 @@ import PageTransition from "../../components/common/PageTransition.jsx";
 import { SkeletonCard, SkeletonGrid } from "../../components/ui/Loader.jsx";
 import { eventService } from "../../api/services.js";
 import { useAuth } from "../../context/AuthContext.jsx";
+import BackButton from "../../components/common/BackButton.jsx";
 import { formatDate } from "../../utils/format.js";
 
 export default function EventReviewReport() {
@@ -39,16 +40,6 @@ export default function EventReviewReport() {
 
   const userRole = (user?.role || "").toLowerCase().trim();
   const fallbackPath = userRole === "admin" ? "/admin/events" : "/faculty/events";
-
-  const handleBack = () => {
-    if (location.state?.from) {
-      navigate(location.state.from);
-    } else if (window.history.length > 2) {
-      navigate(-1);
-    } else {
-      navigate(fallbackPath);
-    }
-  };
 
   const loadReport = async () => {
     if (!id) return;
@@ -126,13 +117,7 @@ export default function EventReviewReport() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button
-              onClick={handleBack}
-              className="btn btn-outline btn-sm"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-            >
-              <FiArrowLeft size={16} /> Back
-            </button>
+            <BackButton fallback={fallbackPath} label="Back" />
             <div>
               <span
                 style={{

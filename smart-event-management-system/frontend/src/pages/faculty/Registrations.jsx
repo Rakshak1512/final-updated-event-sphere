@@ -29,8 +29,7 @@ import { SkeletonGrid, SkeletonRow } from "../../components/ui/Loader.jsx";
 import PageTransition from "../../components/common/PageTransition.jsx";
 import { eventService, registrationService } from "../../api/services.js";
 import { useRealtime } from "../../context/RealtimeContext.jsx";
-import { formatDate } from "../../utils/format.js";
-import { exportToCSV, slugifyFilename } from "../../utils/exportUtils.js";
+import { slugifyFilename } from "../../utils/exportUtils.js";
 import { generateCustomReportPDF } from "../../utils/pdfReportGenerator.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import Pagination from "../../components/ui/Pagination.jsx";
@@ -425,53 +424,6 @@ export default function FacultyRegistrations() {
     toast.success(`Generated official PDF report (${rows.length} records)!`);
   };
 
-  // Report CSV / Excel Export helper
-  const handleExportCSV = (type = "all") => {
-    if (!selectedEvent) return;
-    let targetList = regs;
-    let suffix = "all-registrations";
-
-    if (type === "approved") {
-      targetList = regs.filter((r) => r.status === "approved" || r.status === "attended" || Boolean(r.checked_in_at));
-      suffix = "approved-registrations";
-    } else if (type === "branch" && selectedBranch !== "all") {
-      targetList = regs.filter(
-        (r) => (r.student?.department || "General").toUpperCase() === selectedBranch.toUpperCase()
-      );
-      suffix = `${selectedBranch.toLowerCase()}-registrations`;
-    }
-
-    const filename = `EventSphere_${slugifyFilename(selectedEvent.title, suffix)}_${new Date().toISOString().split("T")[0]}.csv`;
-    const headers = [
-      "S.No",
-      "Student Name",
-      "Register No",
-      "Email Address",
-      "Department",
-      "Class / Sem",
-      "Ticket Code",
-      "Status",
-      "Attendance",
-    ];
-
-    const rows = targetList.map((r, idx) => {
-      const isAttended = r.status === "attended" || r.status === "completed" || Boolean(r.checked_in_at);
-      return [
-        idx + 1,
-        r.student?.name || `Student #${r.student_id}`,
-        r.student?.registration_number || "N/A",
-        r.student?.email || "N/A",
-        r.student?.department || "General",
-        r.student?.semester ? `Sem ${r.student.semester}` : "N/A",
-        r.ticket_code || "N/A",
-        (r.status || "registered").toUpperCase(),
-        isAttended ? "Attended" : "Not Attended",
-      ];
-    });
-
-    exportToCSV(filename, headers, rows);
-    toast.success(`Exported CSV spreadsheet (${rows.length} records)!`);
-  };
 
   // Filtered Events Catalog for Selection View
   const filteredEvents = events.filter((ev) => {
@@ -985,8 +937,9 @@ export default function FacultyRegistrations() {
                     </div>
                   </button>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                     <button
+                      type="button"
                       className="btn btn-primary btn-sm"
                       onClick={() => handleExport("approved")}
                       title="Download Approved Students Official PDF Report"
@@ -994,25 +947,12 @@ export default function FacultyRegistrations() {
                       <FiFileText size={13} /> Approved PDF
                     </button>
                     <button
-                      className="btn btn-outline btn-sm"
-                      onClick={() => handleExportCSV("approved")}
-                      title="Download Approved Students CSV / Excel Spreadsheet"
-                    >
-                      <FiDownload size={13} /> Approved CSV
-                    </button>
-                    <button
+                      type="button"
                       className="btn btn-outline btn-sm"
                       onClick={() => handleExport("all")}
                       title="Download Complete Event Registrations PDF"
                     >
                       <FiFileText size={13} /> All PDF
-                    </button>
-                    <button
-                      className="btn btn-outline btn-sm"
-                      onClick={() => handleExportCSV("all")}
-                      title="Download Complete Event Registrations CSV / Excel"
-                    >
-                      <FiDownload size={13} /> All CSV
                     </button>
                   </div>
                 </div>

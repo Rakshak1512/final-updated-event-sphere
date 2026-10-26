@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
 import {
@@ -41,13 +41,15 @@ import {
   generateResultsReportPDF,
   generateWinnersReportPDF,
 } from "../../utils/pdfReportGenerator.js";
-import { exportToCSV, slugifyFilename } from "../../utils/exportUtils.js";
+import { slugifyFilename } from "../../utils/exportUtils.js";
 import AwardStandingSelector from "../../components/certificate/AwardStandingSelector.jsx";
 import StudentDetailsCard from "../../components/certificate/StudentDetailsCard.jsx";
 import { AWARD_STANDINGS, AWARD_STANDINGS as PRESET_POSITIONS } from "../../components/certificate/certificateConstants.js";
 
 export default function FacultyResults() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [events, setEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
@@ -504,40 +506,6 @@ export default function FacultyResults() {
     }
   };
 
-  const handleExportResultsCSV = () => {
-    if (!selectedEvent) return;
-    try {
-      const headers = [
-        "S.No",
-        "Award / Standing",
-        "Student Name",
-        "Register No",
-        "Branch / Dept",
-        "Class / Sem",
-        "Score / Remarks",
-        "Certificate Status",
-        "Declared By",
-      ];
-      const rows = (results || []).map((r, idx) => [
-        idx + 1,
-        r.position || "Participant",
-        r.student_name || "Student",
-        r.registration_number || "N/A",
-        r.student_department || "General",
-        r.student_semester ? `Sem ${r.student_semester}` : "N/A",
-        r.score_or_remarks || "—",
-        r.certificate_id ? `Issued (ESP-${r.certificate_id})` : "Pending",
-        r.declared_by_name || "Faculty Coordinator",
-      ]);
-      const filename = `EventSphere_${slugifyFilename(selectedEvent.title, "results")}`;
-      exportToCSV(filename, headers, rows);
-      toast.success("Results exported as CSV / Excel!");
-    } catch (err) {
-      console.error("Results CSV export error:", err);
-      toast.error("Could not export Results CSV.");
-    }
-  };
-
   // Filtered Events Catalog for Selection View
   const filteredEvents = events.filter((ev) => {
     if (!eventSearch.trim()) return true;
@@ -760,7 +728,16 @@ export default function FacultyResults() {
             <button
               type="button"
               className="btn btn-outline btn-sm"
-              onClick={() => setSelectedEventId("")}
+              onClick={() => {
+                if (location.state?.from) {
+                  navigate(location.state.from);
+                } else if (window.history.state && typeof window.history.state.idx === "number" && window.history.state.idx > 0 && searchParams.get("eventId")) {
+                  navigate(-1);
+                } else {
+                  setSelectedEventId("");
+                  setSearchParams({});
+                }
+              }}
               style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             >
               <FiArrowLeft size={14} /> Back to All Events
@@ -865,27 +842,16 @@ export default function FacultyResults() {
                     <div style={{ fontSize: 20, fontWeight: 800, color: "#f59e0b" }}>{results.length}</div>
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-sm"
-                        onClick={handleExportResultsPDF}
-                        disabled={results.length === 0}
-                        title="Download Results as PDF Document"
-                      >
-                        <FiFileText size={13} /> Results PDF
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-sm"
-                        onClick={handleExportResultsCSV}
-                        disabled={results.length === 0}
-                        title="Download Results as CSV / Excel Spreadsheet"
-                      >
-                        <FiDownload size={13} /> Results CSV
-                      </button>
-                    </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={handleExportResultsPDF}
+                      disabled={results.length === 0}
+                      title="Download Results as PDF Document"
+                    >
+                      <FiFileText size={13} /> Results PDF
+                    </button>
                     <button
                       type="button"
                       className="btn btn-primary btn-sm"
@@ -893,7 +859,7 @@ export default function FacultyResults() {
                       disabled={results.length === 0}
                       title="Download Official Event Winners PDF"
                     >
-                      <FiAward size={14} /> Download Winners PDF
+                      <FiAward size={14} /> Winners PDF
                     </button>
                   </div>
                 </div>
