@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
@@ -14,6 +14,12 @@ import {
   FiSearch,
   FiX,
   FiClipboard,
+  FiEye,
+  FiFileText,
+  FiClock,
+  FiExternalLink,
+  FiTag,
+  FiCheckCircle,
 } from "react-icons/fi";
 import { BsQrCode } from "react-icons/bs";
 import EmptyState from "../../components/ui/EmptyState.jsx";
@@ -22,9 +28,39 @@ import { SkeletonGrid } from "../../components/ui/Loader.jsx";
 import { registrationService } from "../../api/services.js";
 import { fileUrl, formatDate, statusBadgeClass } from "../../utils/format.js";
 import QRCodeDisplay from "../../components/common/QRCodeDisplay.jsx";
+import EventImage from "../../components/common/EventImage.jsx";
+import { generateCustomReportPDF } from "../../utils/pdfReportGenerator.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useRealtime } from "../../context/RealtimeContext.jsx";
 import BackButton from "../../components/common/BackButton.jsx";
+
+// Helper functions for timeline filters
+const isUpcoming = (ev, status) => {
+  if (status === "cancelled") return false;
+  if (!ev?.event_date) return false;
+  try {
+    const eventDate = new Date(ev.event_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return eventDate >= today;
+  } catch {
+    return false;
+  }
+};
+
+const isCompleted = (ev, status, checkedInAt) => {
+  if (status === "cancelled") return false;
+  if (status === "attended" || status === "completed" || Boolean(checkedInAt)) return true;
+  if (!ev?.event_date) return false;
+  try {
+    const eventDate = new Date(ev.event_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return eventDate < today;
+  } catch {
+    return false;
+  }
+};
 
 export default function MyRegistrations() {
   const { user } = useAuth();
@@ -35,8 +71,10 @@ export default function MyRegistrations() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [qrModal, setQrModal] = useState(null);
+  const [detailsModal, setDetailsModal] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelling, setCancelling] = useState(false);
+  const [exportingReport, setExportingReport] = useState(false);
   const { addListener } = useRealtime();
 
   const load = () => {
@@ -73,7 +111,6 @@ export default function MyRegistrations() {
         msg.type === "SEAT_REASSIGNED" ||
         msg.type === "ATTENDANCE_CHECKED_IN"
       ) {
-        // Silently reload student's registrations to update seats & statuses in real time
         registrationService
           .my()
           .then(({ data }) => setRegs(Array.isArray(data) ? data : []))
@@ -91,6 +128,9 @@ export default function MyRegistrations() {
       await registrationService.cancel(cancelTarget.id);
       toast.success("Registration cancelled successfully");
       setCancelTarget(null);
+      if (detailsModal?.id === cancelTarget.id) {
+        setDetailsModal(null);
+      }
       load();
     } catch (err) {
       toast.error(
@@ -130,37 +170,117 @@ export default function MyRegistrations() {
     }
   };
 
-  const getQrUrl = (reg) => {
-    if (!reg) return "";
-    if (reg.qr_code_path) {
-      const formatted = fileUrl(reg.qr_code_path);
-      if (formatted) return formatted;
+  // Official PDF Registration Report for the student
+  const handleDownloadReportPDF = () => {
+    if (!filteredRegs || filteredRegs.length === 0) {
+      toast.error("No registration records found for current filter.");
+      return;
     }
-    if (reg.ticket_code) {
-      return `/api/registrations/ticket/${reg.ticket_code}/qr`;
+    setExportingReport(true);
+
+    try {
+      const headers = [
+        "S.No",
+        "Event Title",
+        "Event Date & Time",
+        "Venue",
+        "Ticket Code",
+        "Status",
+        "Registered On",
+      ];
+
+      const rows = filteredRegs.map((r, idx) => {
+        const ev = r.event || {};
+        const isAttended = r.status === "attended" || r.status === "completed" || Boolean(r.checked_in_at);
+        const statusLabel = isAttended
+          ? "ATTENDED"
+          : (r.status || "registered").toUpperCase();
+
+        const dateTime = `${formatDate(ev.event_date)}${ev.event_time ? ` · ${ev.event_time}` : ""}`;
+        return [
+          idx + 1,
+          ev.title || "Campus Event",
+          dateTime,
+          ev.venue || "Campus Venue",
+          r.ticket_code || `REG-${r.id}`,
+          statusLabel,
+          formatDate(r.registered_at),
+        ];
+      });
+
+      const attendedCount = filteredRegs.filter(
+        (r) => r.status === "attended" || r.status === "completed" || Boolean(r.checked_in_at)
+      ).length;
+
+      const upcomingCount = filteredRegs.filter((r) => isUpcoming(r.event, (r.status || "").toLowerCase())).length;
+
+      generateCustomReportPDF({
+        title: "My Event Registrations Report",
+        subtitle: `Official Registration Roster — ${user?.name || "Student"}`,
+        headers,
+        rows,
+        orientation: "landscape",
+        includeSummary: true,
+        summaryCards: [
+          { label: "Total Registrations", value: filteredRegs.length, color: [79, 70, 229] },
+          { label: "Upcoming Events", value: upcomingCount, color: [16, 185, 129] },
+          { label: "Attended Events", value: attendedCount, color: [139, 92, 246] },
+        ],
+        metadata: [
+          { label: "Student Name", value: user?.name || "Student" },
+          { label: "Register No", value: user?.registration_number || user?.email || "N/A" },
+          { label: "Department", value: user?.department || "General" },
+          { label: "Active Filter", value: statusFilter.toUpperCase() },
+        ],
+        filename: `EventSphere_My_Registrations_${new Date().toISOString().split("T")[0]}.pdf`,
+      });
+
+      toast.success("Official Registration Report PDF downloaded!");
+    } catch (err) {
+      console.error("Failed to generate registrations report PDF:", err);
+      toast.error("Could not generate registrations PDF report.");
+    } finally {
+      setExportingReport(false);
     }
-    return `/api/registrations/${reg.id}/qr`;
   };
 
-  const filteredRegs = regs.filter((r) => {
-    const rawStatus = (r.status || "registered").toLowerCase();
-    if (statusFilter !== "all") {
-      if (statusFilter === "attended" && !(rawStatus === "attended" || rawStatus === "completed" || r.checked_in_at)) return false;
-      if (statusFilter === "approved" && rawStatus !== "approved") return false;
-      if (statusFilter === "pending" && rawStatus !== "pending" && rawStatus !== "registered") return false;
-      if (statusFilter === "cancelled" && rawStatus !== "cancelled") return false;
-    }
+  const filteredRegs = useMemo(() => {
+    return regs.filter((r) => {
+      const ev = r.event || {};
+      const rawStatus = (r.status || "registered").toLowerCase();
 
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.trim().toLowerCase();
-    const title = (r.event?.title || "").toLowerCase();
-    const cat = (r.event?.category || "").toLowerCase();
-    const venue = (r.event?.venue || "").toLowerCase();
-    const ticket = (r.ticket_code || "").toLowerCase();
-    const statusStr = rawStatus;
+      if (statusFilter === "upcoming") {
+        if (!isUpcoming(ev, rawStatus)) return false;
+      } else if (statusFilter === "completed") {
+        if (!isCompleted(ev, rawStatus, r.checked_in_at)) return false;
+      } else if (statusFilter === "cancelled") {
+        if (rawStatus !== "cancelled") return false;
+      } else if (statusFilter === "approved") {
+        if (rawStatus !== "approved") return false;
+      } else if (statusFilter === "pending") {
+        if (rawStatus !== "pending" && rawStatus !== "registered") return false;
+      }
 
-    return title.includes(q) || cat.includes(q) || venue.includes(q) || ticket.includes(q) || statusStr.includes(q);
-  });
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.trim().toLowerCase();
+      const title = (ev.title || "").toLowerCase();
+      const cat = (ev.category || "").toLowerCase();
+      const venue = (ev.venue || "").toLowerCase();
+      const ticket = (r.ticket_code || "").toLowerCase();
+      const statusStr = rawStatus;
+
+      return title.includes(q) || cat.includes(q) || venue.includes(q) || ticket.includes(q) || statusStr.includes(q);
+    });
+  }, [regs, statusFilter, searchQuery]);
+
+  const tabCounts = useMemo(() => {
+    return {
+      all: regs.length,
+      upcoming: regs.filter((r) => isUpcoming(r.event, (r.status || "").toLowerCase())).length,
+      completed: regs.filter((r) => isCompleted(r.event, (r.status || "").toLowerCase(), r.checked_in_at)).length,
+      cancelled: regs.filter((r) => (r.status || "").toLowerCase() === "cancelled").length,
+    };
+  }, [regs]);
 
   return (
     <div>
@@ -184,13 +304,14 @@ export default function MyRegistrations() {
             Track your campus event registrations, digital QR passes, and downloadable slips.
           </p>
         </div>
+
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           {regs.length > 0 && (
-            <div style={{ position: "relative", minWidth: 0, width: "100%", maxWidth: 360 }}>
+            <div style={{ position: "relative", minWidth: 0, width: "100%", maxWidth: 300 }}>
               <input
                 className="form-input"
                 style={{ padding: "8px 34px 8px 34px", fontSize: 13 }}
-                placeholder="Search event, ticket code, status..."
+                placeholder="Search by event, ticket, venue..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -226,13 +347,33 @@ export default function MyRegistrations() {
               )}
             </div>
           )}
-          <button type="button" className="btn btn-outline btn-sm" onClick={load} disabled={loading}>
-            <FiRefreshCw className={loading ? "spin" : ""} /> Refresh
+
+          {regs.length > 0 && (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={handleDownloadReportPDF}
+              disabled={exportingReport || filteredRegs.length === 0}
+              title="Download filtered registrations summary as official PDF document"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <FiFileText size={13} /> {exportingReport ? "Generating..." : "Download Report (PDF)"}
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={load}
+            disabled={loading}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+          >
+            <FiRefreshCw className={loading ? "spin" : ""} size={13} /> Refresh
           </button>
         </div>
       </div>
 
-      {/* Status Filter Tabs */}
+      {/* Filter Tabs: All, Upcoming, Completed, Cancelled */}
       {regs.length > 0 && (
         <div
           style={{
@@ -244,11 +385,10 @@ export default function MyRegistrations() {
           }}
         >
           {[
-            { key: "all", label: "All Registrations", count: regs.length },
-            { key: "approved", label: "Approved", count: regs.filter((r) => r.status === "approved").length },
-            { key: "attended", label: "Attended", count: regs.filter((r) => r.status === "attended" || r.status === "completed" || r.checked_in_at).length },
-            { key: "pending", label: "Pending", count: regs.filter((r) => r.status === "pending" || r.status === "registered").length },
-            { key: "cancelled", label: "Cancelled", count: regs.filter((r) => r.status === "cancelled").length },
+            { key: "all", label: "All Registrations", count: tabCounts.all },
+            { key: "upcoming", label: "Upcoming", count: tabCounts.upcoming },
+            { key: "completed", label: "Completed", count: tabCounts.completed },
+            { key: "cancelled", label: "Cancelled", count: tabCounts.cancelled },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -363,7 +503,7 @@ export default function MyRegistrations() {
             const ev = r.event || {};
             const rawStatus = (r.status || "registered").toLowerCase();
             const isCancelled = rawStatus === "cancelled";
-            const isAttended = rawStatus === "attended" || rawStatus === "completed" || !!r.checked_in_at;
+            const isAttended = rawStatus === "attended" || rawStatus === "completed" || Boolean(r.checked_in_at);
             const regKey = r.id || r.ticket_code || `reg-${index}`;
 
             return (
@@ -371,7 +511,8 @@ export default function MyRegistrations() {
                 key={regKey}
                 className="glass-card"
                 style={{
-                  padding: 22,
+                  padding: 0,
+                  overflow: "hidden",
                   display: "flex",
                   flexDirection: "column",
                   opacity: isCancelled ? 0.65 : 1,
@@ -379,142 +520,198 @@ export default function MyRegistrations() {
                   transition: "all 0.2s ease",
                   border: isAttended
                     ? "1px solid rgba(16, 185, 129, 0.35)"
+                    : isCancelled
+                    ? "1px solid rgba(239, 68, 68, 0.2)"
                     : "1px solid rgba(139, 92, 246, 0.2)",
                   background: isAttended
                     ? "linear-gradient(180deg, var(--bg-elevated) 0%, rgba(16, 185, 129, 0.04) 100%)"
                     : "var(--bg-elevated)",
                 }}
               >
-                {/* Header tags */}
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: 12,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                    <span className={`badge ${statusBadgeClass(rawStatus)}`}>
-                      {rawStatus.toUpperCase()}
-                    </span>
-                    {isAttended && (
-                      <span className="badge badge-success" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                        <FiCheck size={11} /> ATTENDED
-                      </span>
-                    )}
-                  </div>
+                {/* Event Image Banner with Category Badge */}
+                <div style={{ position: "relative", width: "100%", height: 140 }}>
+                  <EventImage
+                    event={ev}
+                    height="100%"
+                    width="100%"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                  {ev.category && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 10,
+                        left: 10,
+                        background: "rgba(15, 23, 42, 0.8)",
+                        backdropFilter: "blur(8px)",
+                        color: "#c084fc",
+                        border: "1px solid rgba(139, 92, 246, 0.3)",
+                        padding: "3px 8px",
+                        borderRadius: 8,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {ev.category}
+                    </div>
+                  )}
 
                   <span
                     style={{
-                      fontSize: 12,
+                      position: "absolute",
+                      top: 10,
+                      right: 10,
+                      fontSize: 11,
                       fontWeight: 700,
-                      color: "#8b5cf6",
+                      color: "#fff",
                       fontFamily: "monospace",
-                      background: "rgba(139, 92, 246, 0.1)",
+                      background: "rgba(15, 23, 42, 0.85)",
+                      backdropFilter: "blur(8px)",
+                      border: "1px solid rgba(255, 255, 255, 0.15)",
                       padding: "3px 8px",
-                      borderRadius: 6,
+                      borderRadius: 8,
                     }}
                   >
                     #{r.ticket_code || `REG-${r.id || index}`}
                   </span>
                 </div>
 
-                <h3 style={{ fontSize: 17, marginBottom: 8, fontWeight: 700 }}>
-                  {ev.title || "Campus Event"}
-                </h3>
-
-                {/* Team Tag if part of a team */}
-                {r.team_name && (
+                <div style={{ padding: 20, display: "flex", flexDirection: "column", flex: 1 }}>
+                  {/* Status Badges */}
                   <div
                     style={{
-                      display: "inline-flex",
+                      display: "flex",
+                      justifyContent: "space-between",
                       alignItems: "center",
-                      gap: 6,
-                      background: "rgba(139, 92, 246, 0.12)",
-                      color: "#8b5cf6",
-                      padding: "4px 10px",
-                      borderRadius: 8,
-                      fontSize: 12,
-                      fontWeight: 600,
+                      gap: 8,
                       marginBottom: 10,
-                      width: "fit-content",
+                      flexWrap: "wrap",
                     }}
                   >
-                    <FiUsers size={13} />
-                    <span>Team: {r.team_name}</span>
-                    {r.team_role && (
-                      <span style={{ opacity: 0.75, fontSize: 11 }}>({r.team_role})</span>
-                    )}
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                      <span className={`badge ${statusBadgeClass(rawStatus)}`}>
+                        {rawStatus.toUpperCase()}
+                      </span>
+                      {isAttended && (
+                        <span className="badge badge-success" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          <FiCheck size={11} /> ATTENDED
+                        </span>
+                      )}
+                    </div>
+
+                    <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
+                      Registered: {formatDate(r.registered_at)}
+                    </span>
                   </div>
-                )}
 
-                <div
-                  style={{
-                    fontSize: 13,
-                    color: "var(--text-secondary)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 6,
-                    marginBottom: 18,
-                  }}
-                >
-                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <FiCalendar size={14} style={{ color: "#8b5cf6" }} />{" "}
-                    {formatDate(ev.event_date)} {ev.event_time ? `· ${ev.event_time}` : ""}
-                  </span>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <FiMapPin size={14} style={{ color: "#8b5cf6" }} />{" "}
-                    {ev.venue || "Campus Venue"}
-                  </span>
-                </div>
+                  <h3 style={{ fontSize: 17, marginBottom: 8, fontWeight: 700, lineHeight: 1.3 }}>
+                    {ev.title || "Campus Event"}
+                  </h3>
 
-                {/* Actions */}
-                <div
-                  style={{
-                    marginTop: "auto",
-                    display: "flex",
-                    gap: 8,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-                    onClick={() => setQrModal(r)}
-                    disabled={isCancelled}
-                    title="View QR Ticket Pass"
+                  {/* Team Tag if part of a team */}
+                  {r.team_name && (
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        background: "rgba(139, 92, 246, 0.12)",
+                        color: "#8b5cf6",
+                        padding: "4px 10px",
+                        borderRadius: 8,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        marginBottom: 10,
+                        width: "fit-content",
+                      }}
+                    >
+                      <FiUsers size={13} />
+                      <span>Team: {r.team_name}</span>
+                      {r.team_role && (
+                        <span style={{ opacity: 0.75, fontSize: 11 }}>({r.team_role})</span>
+                      )}
+                    </div>
+                  )}
+
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: "var(--text-secondary)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 6,
+                      marginBottom: 16,
+                    }}
                   >
-                    <BsQrCode size={14} /> View QR
-                  </button>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <FiCalendar size={14} style={{ color: "#8b5cf6", flexShrink: 0 }} />{" "}
+                      <span>{formatDate(ev.event_date)} {ev.event_time ? `· ${ev.event_time}` : ""}</span>
+                    </span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <FiMapPin size={14} style={{ color: "#8b5cf6", flexShrink: 0 }} />{" "}
+                      <span>{ev.venue || "Campus Venue"}</span>
+                    </span>
+                  </div>
 
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    onClick={() => handleDownloadSlip(r.id)}
-                    title="Download Registration Slip (PDF)"
-                    disabled={isCancelled}
+                  {/* Actions Bar */}
+                  <div
+                    style={{
+                      marginTop: "auto",
+                      display: "flex",
+                      gap: 6,
+                      flexWrap: "wrap",
+                      paddingTop: 12,
+                      borderTop: "1px solid var(--border-color)",
+                    }}
                   >
-                    <FiDownload size={14} /> Slip
-                  </button>
-
-                  {!isCancelled && !isAttended && (
                     <button
                       type="button"
-                      className="btn btn-sm"
-                      style={{
-                        background: "rgba(220, 38, 38, 0.1)",
-                        color: "var(--danger)",
-                      }}
-                      onClick={() => setCancelTarget(r)}
-                      title="Cancel Registration"
+                      className="btn btn-outline btn-sm"
+                      style={{ flex: 1, minWidth: "90px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5 }}
+                      onClick={() => setDetailsModal(r)}
+                      title="View Registration & Event Details"
                     >
-                      <FiXCircle size={14} />
+                      <FiEye size={13} /> Details
                     </button>
-                  )}
+
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      style={{ flex: 1, minWidth: "95px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5 }}
+                      onClick={() => setQrModal(r)}
+                      disabled={isCancelled}
+                      title="View QR Ticket Pass"
+                    >
+                      <BsQrCode size={13} /> QR Pass
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => handleDownloadSlip(r.id)}
+                      title="Download Official PDF Slip"
+                      disabled={isCancelled}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
+                    >
+                      <FiDownload size={13} /> Slip
+                    </button>
+
+                    {!isCancelled && !isAttended && isUpcoming(ev, rawStatus) && (
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        style={{
+                          background: "rgba(220, 38, 38, 0.1)",
+                          color: "var(--danger)",
+                        }}
+                        onClick={() => setCancelTarget(r)}
+                        title="Cancel Registration"
+                      >
+                        <FiXCircle size={14} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -522,9 +719,129 @@ export default function MyRegistrations() {
         </div>
       )}
 
+      {/* VIEW DETAILS MODAL */}
+      <Modal
+        open={Boolean(detailsModal)}
+        onClose={() => setDetailsModal(null)}
+        title="Registration & Event Details"
+        width={560}
+      >
+        {detailsModal && (
+          <div>
+            <div style={{ borderRadius: 14, overflow: "hidden", height: 160, marginBottom: 16 }}>
+              <EventImage
+                event={detailsModal.event}
+                height="100%"
+                width="100%"
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <h3 style={{ fontSize: 19, fontWeight: 800, margin: 0 }}>
+                {detailsModal.event?.title || "Campus Event"}
+              </h3>
+              <span className={`badge ${statusBadgeClass(detailsModal.status)}`}>
+                {(detailsModal.status || "registered").toUpperCase()}
+              </span>
+            </div>
+
+            {detailsModal.event?.description && (
+              <p style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 16 }}>
+                {detailsModal.event.description}
+              </p>
+            )}
+
+            <div
+              style={{
+                background: "rgba(139, 92, 246, 0.06)",
+                border: "1px solid rgba(139, 92, 246, 0.18)",
+                borderRadius: 14,
+                padding: "14px 16px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                fontSize: 13,
+                marginBottom: 20,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "var(--text-muted)" }}>Ticket Code:</span>
+                <span style={{ fontWeight: 700, color: "#8b5cf6", fontFamily: "monospace" }}>
+                  #{detailsModal.ticket_code}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "var(--text-muted)" }}>Registration ID:</span>
+                <span style={{ fontWeight: 600 }}>#{detailsModal.id}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "var(--text-muted)" }}>Registered On:</span>
+                <span>{formatDate(detailsModal.registered_at)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "var(--text-muted)" }}>Event Date:</span>
+                <span>{formatDate(detailsModal.event?.event_date)} {detailsModal.event?.event_time ? `· ${detailsModal.event.event_time}` : ""}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "var(--text-muted)" }}>Venue:</span>
+                <span>{detailsModal.event?.venue || "Campus Venue"}</span>
+              </div>
+              {detailsModal.team_name && (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "var(--text-muted)" }}>Team Name:</span>
+                  <span style={{ color: "#8b5cf6", fontWeight: 600 }}>{detailsModal.team_name} ({detailsModal.team_role || "Member"})</span>
+                </div>
+              )}
+              {detailsModal.checked_in_at && (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "var(--text-muted)" }}>Checked In:</span>
+                  <span style={{ color: "var(--success)", fontWeight: 600 }}>{formatDate(detailsModal.checked_in_at)}</span>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "space-between" }}>
+              <Link
+                to={`/student/events/${detailsModal.event_id || detailsModal.event?.id}`}
+                className="btn btn-outline btn-sm"
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                <FiExternalLink size={13} /> View Full Event Page
+              </Link>
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => {
+                    const target = detailsModal;
+                    setDetailsModal(null);
+                    setQrModal(target);
+                  }}
+                  disabled={detailsModal.status === "cancelled"}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                >
+                  <BsQrCode size={13} /> View QR
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => handleDownloadSlip(detailsModal.id)}
+                  disabled={detailsModal.status === "cancelled"}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                >
+                  <FiDownload size={13} /> PDF Slip
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {/* QR PASS MODAL */}
       <Modal
-        open={!!qrModal}
+        open={Boolean(qrModal)}
         onClose={() => setQrModal(null)}
         title="Event Ticket Pass & QR Code"
         width={440}
@@ -609,7 +926,7 @@ export default function MyRegistrations() {
             <button
               type="button"
               className="btn btn-primary"
-              style={{ width: "100%" }}
+              style={{ width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}
               onClick={() => handleDownloadSlip(qrModal.id)}
             >
               <FiDownload /> Download Slip (PDF)
@@ -620,14 +937,14 @@ export default function MyRegistrations() {
 
       {/* CANCEL REGISTRATION MODAL */}
       <Modal
-        open={!!cancelTarget}
+        open={Boolean(cancelTarget)}
         onClose={() => setCancelTarget(null)}
         title="Cancel Registration"
         width={440}
       >
         <p style={{ fontSize: 14, color: "var(--text-secondary)", marginBottom: 20 }}>
           Are you sure you want to cancel your registration for{" "}
-          <strong>{cancelTarget?.event?.title}</strong>?
+          <strong>{cancelTarget?.event?.title}</strong>? This will release your seat back to the event capacity.
         </p>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
