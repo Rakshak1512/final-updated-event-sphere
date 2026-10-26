@@ -255,15 +255,23 @@ def get_event_branch_stats_endpoint(
 @router.get("/{registration_id}/slip")
 def download_slip(
     registration_id: int,
-    current_user: User = Depends(require_role(RoleEnum.student)),
+    current_user: User = Depends(require_role(RoleEnum.student, RoleEnum.faculty, RoleEnum.admin)),
 ):
     registration = db_service.get_registration_by_id(registration_id)
-    if not registration or registration.student_id != current_user.id:
+    if not registration:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registration not found")
 
+    user_role_val = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role).lower()
+    if user_role_val == "student" and registration.student_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only download your own registration slip")
+
+    student_user = db_service.get_user_by_id(registration.student_id) if registration.student_id else None
+    student_name = (student_user.name if student_user else None) or (getattr(registration.student, "name", None) if registration.student else "Student")
+    student_reg_no = (student_user.registration_number if student_user else None) or (getattr(registration.student, "registration_number", None) if registration.student else "N/A")
+
     pdf_bytes = generate_registration_slip_pdf(
-        student_name=current_user.name,
-        registration_number=current_user.registration_number or "N/A",
+        student_name=student_name,
+        registration_number=student_reg_no or "N/A",
         event_title=registration.event.title if registration.event else "Event",
         venue=registration.event.venue if registration.event else "N/A",
         event_date=str(registration.event.event_date) if registration.event else "N/A",

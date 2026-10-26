@@ -65,14 +65,28 @@ export default function FacultyRegistrations() {
     searchParams.get("eventId") || (location.state?.eventId ? String(location.state.eventId) : "")
   );
 
-  // Keep selectedEventId synchronized when searchParams changes (e.g. browser back/forward, link navigation)
+  const selectEvent = (id, branch = "all") => {
+    const nextId = id ? String(id) : "";
+    setSelectedEventId(nextId);
+    setSelectedBranch(branch);
+    if (nextId) {
+      const params = { eventId: nextId };
+      if (branch && branch !== "all") params.branch = branch;
+      setSearchParams(params, { replace: true });
+    } else {
+      setSearchParams({}, { replace: true });
+    }
+  };
+
+  // Keep selectedEventId & branch synchronized when searchParams changes (e.g. browser back/forward, link navigation)
   useEffect(() => {
     const qId = searchParams.get("eventId") || "";
+    const qBranch = searchParams.get("branch") || "all";
     if (qId !== selectedEventId) {
       setSelectedEventId(qId);
-      if (!qId) {
-        setSelectedBranch("all");
-      }
+    }
+    if (qBranch !== selectedBranch) {
+      setSelectedBranch(qBranch);
     }
   }, [searchParams]);
 
@@ -83,7 +97,7 @@ export default function FacultyRegistrations() {
   const [loadingRegs, setLoadingRegs] = useState(false);
 
   // Filters & Search
-  const [activeFilter, setActiveFilter] = useState("all"); // "all" | "pending" | "approved" | "cancelled"
+  const [activeFilter, setActiveFilter] = useState("all"); // "all" | "pending" | "approved" | "attended" | "cancelled"
   const [selectedBranch, setSelectedBranch] = useState(searchParams.get("branch") || "all");
   const [studentSearch, setStudentSearch] = useState("");
 
@@ -152,20 +166,6 @@ export default function FacultyRegistrations() {
 
     return () => clearInterval(interval);
   }, [selectedEventId, isStaff, isEventManageable]);
-
-  // Sync selectedEventId & branch with URL search params
-  useEffect(() => {
-    const currentQ = searchParams.get("eventId") || "";
-    const currentBranch = searchParams.get("branch") || "all";
-    if (selectedEventId && (currentQ !== selectedEventId || (selectedBranch !== "all" && currentBranch !== selectedBranch))) {
-      const params = {};
-      params.eventId = selectedEventId;
-      if (selectedBranch && selectedBranch !== "all") params.branch = selectedBranch;
-      setSearchParams(params, { replace: true });
-    } else if (!selectedEventId && currentQ) {
-      setSearchParams({}, { replace: true });
-    }
-  }, [selectedEventId, selectedBranch, searchParams, setSearchParams]);
 
   // Load Registrations & Branch Stats for Selected Event
   const loadEventRegistrations = useCallback(
@@ -286,11 +286,13 @@ export default function FacultyRegistrations() {
   const pendingCount = regs.filter(
     (r) => r.status === "pending" || r.status === "registered"
   ).length;
-  const approvedCount = regs.filter((r) => r.status === "approved").length;
-  const cancelledCount = regs.filter((r) => r.status === "cancelled").length;
+  const approvedCount = regs.filter(
+    (r) => r.status === "approved" || r.status === "attended" || r.status === "completed"
+  ).length;
   const attendedCount = regs.filter(
     (r) => r.status === "attended" || r.status === "completed" || Boolean(r.checked_in_at)
   ).length;
+  const cancelledCount = regs.filter((r) => r.status === "cancelled").length;
 
   // Dynamic branch list from registered students data
   const dynamicBranches = useMemo(() => {
@@ -306,10 +308,10 @@ export default function FacultyRegistrations() {
       }
       map[b].total += 1;
       const st = String(r.status || "").toLowerCase();
-      if (st === "approved") map[b].approved += 1;
+      if (st === "approved" || st === "attended" || st === "completed") map[b].approved += 1;
       else if (st === "pending" || st === "registered") map[b].pending += 1;
       else if (st === "cancelled") map[b].cancelled += 1;
-      else if (st === "attended" || st === "completed") map[b].attended += 1;
+      if (st === "attended" || st === "completed" || Boolean(r.checked_in_at)) map[b].attended += 1;
     }
     return Object.values(map).sort((a, b) => b.total - a.total);
   }, [branchStats, regs]);
@@ -318,9 +320,10 @@ export default function FacultyRegistrations() {
   const filteredRegs = useMemo(() => {
     return regs.filter((r) => {
       // 1. Status Filter
-      const st = String(r.status || "").toLowerCase();
+      const st = String(r.status || "registered").toLowerCase();
       if (activeFilter === "pending" && st !== "pending" && st !== "registered") return false;
-      if (activeFilter === "approved" && st !== "approved") return false;
+      if (activeFilter === "approved" && st !== "approved" && st !== "attended" && st !== "completed") return false;
+      if (activeFilter === "attended" && st !== "attended" && st !== "completed" && !r.checked_in_at) return false;
       if (activeFilter === "cancelled" && st !== "cancelled") return false;
 
       // 2. Branch Filter
@@ -365,23 +368,31 @@ export default function FacultyRegistrations() {
     return filteredRegs.slice(start, start + pageSize);
   }, [filteredRegs, currentPage, pageSize]);
 
-  // Report PDF / Export helper
-  const handleExport = (type = "all") => {
+  // Report PDF / Export helper with full async/await and robust formatting
+  const handleExport = async (type = "all") => {
     if (!selectedEvent) return;
     let targetList = regs;
     let suffix = "all-registrations";
     let reportSubtitle = "Official Complete Registrations Roster";
 
     if (type === "approved") {
-      targetList = regs.filter((r) => r.status === "approved" || r.status === "attended" || Boolean(r.checked_in_at));
+      targetList = regs.filter((r) => r.status === "approved" || r.status === "attended" || r.status === "completed" || Boolean(r.checked_in_at));
       suffix = "approved-registrations";
       reportSubtitle = "Approved Students Attendance & Verification Roster";
+    } else if (type === "attended") {
+      targetList = regs.filter((r) => r.status === "attended" || r.status === "completed" || Boolean(r.checked_in_at));
+      suffix = "attended-students";
+      reportSubtitle = "Verified Attendees Roster";
     } else if (type === "branch" && selectedBranch !== "all") {
       targetList = regs.filter(
         (r) => (r.student?.department || "General").toUpperCase() === selectedBranch.toUpperCase()
       );
       suffix = `${selectedBranch.toLowerCase()}-registrations`;
       reportSubtitle = `Department Registration Roster — ${selectedBranch}`;
+    } else if (type === "filtered") {
+      targetList = filteredRegs;
+      suffix = "filtered-roster";
+      reportSubtitle = `Event Registrations Roster (Filtered View)`;
     }
 
     const filename = `EventSphere_${slugifyFilename(selectedEvent.title, suffix)}_${new Date().toISOString().split("T")[0]}.pdf`;
@@ -412,32 +423,55 @@ export default function FacultyRegistrations() {
       ];
     });
 
-    const attendedCount = targetList.filter(
+    const attCount = targetList.filter(
       (r) => r.status === "attended" || r.status === "completed" || Boolean(r.checked_in_at)
     ).length;
 
-    generateCustomReportPDF({
-      title: `${selectedEvent.title} — Registration Report`,
-      subtitle: reportSubtitle,
-      event: selectedEvent,
-      headers,
-      rows,
-      orientation: "landscape",
-      includeSummary: true,
-      summaryCards: [
-        { label: "Total Registrations", value: targetList.length, color: [79, 70, 229] },
-        { label: "Attended Present", value: attendedCount, color: [16, 185, 129] },
-        { label: "Pending Attendance", value: Math.max(0, targetList.length - attendedCount), color: [245, 158, 11] },
-      ],
-      metadata: [
-        { label: "Event Date", value: selectedEvent.event_date },
-        { label: "Venue", value: selectedEvent.venue || "Campus Venue" },
-        { label: "Roster Scope", value: type.toUpperCase() },
-      ],
-      filename,
-    });
+    try {
+      toast.loading("Generating PDF Report...", { id: "export-pdf" });
+      await generateCustomReportPDF({
+        title: `${selectedEvent.title} — Registration Report`,
+        subtitle: reportSubtitle,
+        event: selectedEvent,
+        headers,
+        rows,
+        orientation: "landscape",
+        includeSummary: true,
+        summaryCards: [
+          { label: "Total Registrations", value: targetList.length, color: [79, 70, 229] },
+          { label: "Attended Present", value: attCount, color: [16, 185, 129] },
+          { label: "Pending Attendance", value: Math.max(0, targetList.length - attCount), color: [245, 158, 11] },
+        ],
+        metadata: [
+          { label: "Event Date", value: selectedEvent.event_date },
+          { label: "Venue", value: selectedEvent.venue || "Campus Venue" },
+          { label: "Roster Scope", value: type.toUpperCase() },
+        ],
+        filename,
+      });
+      toast.success(`Generated official PDF report (${rows.length} records)!`, { id: "export-pdf" });
+    } catch (err) {
+      console.error("PDF generation error:", err);
+      toast.error("Failed to generate PDF report.", { id: "export-pdf" });
+    }
+  };
 
-    toast.success(`Generated official PDF report (${rows.length} records)!`);
+  // Quick 1-click Download for any event directly from the catalog
+  const handleQuickDownloadEventPDF = async (ev) => {
+    try {
+      toast.loading(`Fetching registrations for ${ev.title}...`, { id: `quick-pdf-${ev.id}` });
+      const { data: eventRegs } = await registrationService.forEvent(ev.id);
+      const list = eventRegs || [];
+      await generateRegistrationReportPDF({
+        event: ev,
+        registrations: list,
+        statusFilter: "active",
+      });
+      toast.success(`Downloaded registration report for ${ev.title} (${list.length} records)!`, { id: `quick-pdf-${ev.id}` });
+    } catch (err) {
+      console.error("Quick PDF download error:", err);
+      toast.error(`Could not download PDF for ${ev.title}.`, { id: `quick-pdf-${ev.id}` });
+    }
   };
 
 
@@ -592,10 +626,7 @@ export default function FacultyRegistrations() {
                       cursor: "pointer",
                       border: "1.5px solid rgba(139, 92, 246, 0.25)",
                     }}
-                    onClick={() => {
-                      setSelectedEventId(String(ev.id));
-                      setSearchParams({ eventId: String(ev.id) }, { replace: true });
-                    }}
+                    onClick={() => selectEvent(ev.id)}
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                       <span className="badge badge-info">{ev.category || "Campus Event"}</span>
@@ -659,18 +690,31 @@ export default function FacultyRegistrations() {
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-sm"
-                      style={{ width: "100%", justifyContent: "center", gap: 8 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedEventId(String(ev.id));
-                        setSearchParams({ eventId: String(ev.id) }, { replace: true });
-                      }}
-                    >
-                      <FiUserCheck size={14} /> Manage Registrations
-                    </button>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        style={{ justifyContent: "center", gap: 6 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          selectEvent(ev.id);
+                        }}
+                      >
+                        <FiUserCheck size={14} /> Registrations
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        style={{ justifyContent: "center", gap: 6, color: "#a5b4fc", borderColor: "rgba(165, 180, 252, 0.4)" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleQuickDownloadEventPDF(ev);
+                        }}
+                        title="Download official PDF report directly"
+                      >
+                        <FiDownload size={14} /> Report PDF
+                      </button>
+                    </div>
                   </motion.div>
                 );
               })}
@@ -696,11 +740,7 @@ export default function FacultyRegistrations() {
             <button
               type="button"
               className="btn btn-outline btn-sm"
-              onClick={() => {
-                setSelectedEventId("");
-                setSelectedBranch("all");
-                setSearchParams({}, { replace: true });
-              }}
+              onClick={() => selectEvent("")}
               style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             >
               <FiArrowLeft size={14} /> Back to Events
@@ -710,14 +750,9 @@ export default function FacultyRegistrations() {
               <label style={{ fontSize: 13, color: "var(--text-muted)" }}>Switch Event:</label>
               <select
                 className="form-select"
-                style={{ minWidth: 240, maxWidth: 360, fontSize: 13 }}
+                style={{ minWidth: 220, maxWidth: 320, fontSize: 13 }}
                 value={selectedEventId}
-                onChange={(e) => {
-                  const nextId = e.target.value;
-                  setSelectedEventId(nextId);
-                  setSelectedBranch("all");
-                  setSearchParams({ eventId: nextId }, { replace: true });
-                }}
+                onChange={(e) => selectEvent(e.target.value)}
               >
                 {events.map((ev) => (
                   <option key={ev.id} value={String(ev.id)}>
@@ -732,6 +767,25 @@ export default function FacultyRegistrations() {
                 title="Refresh registrations"
               >
                 <FiRefreshCw className={loadingRegs ? "spin" : ""} size={16} />
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => handleExport("all")}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                title="Download complete event registrations roster as PDF"
+              >
+                <FiDownload size={14} /> Download Roster (PDF)
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => handleExport("approved")}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                title="Download approved students attendance verification sheet as PDF"
+              >
+                <FiFileText size={14} /> Attendance Sheet (PDF)
               </button>
             </div>
           </div>
@@ -1306,6 +1360,23 @@ export default function FacultyRegistrations() {
               </button>
               <button
                 type="button"
+                onClick={() => setActiveFilter("attended")}
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: 10,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  border: "none",
+                  background: activeFilter === "attended" ? "var(--gradient-primary)" : "transparent",
+                  color: activeFilter === "attended" ? "#fff" : "var(--text-secondary)",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                Attended ({attendedCount})
+              </button>
+              <button
+                type="button"
                 onClick={() => setActiveFilter("cancelled")}
                 style={{
                   padding: "8px 18px",
@@ -1323,46 +1394,58 @@ export default function FacultyRegistrations() {
               </button>
             </div>
 
-            {/* Multi-Field Search Input with Working Clear Button */}
-            <div style={{ position: "relative", minWidth: 0, flex: "1 1 240px", maxWidth: 440, width: "100%" }}>
-              <input
-                className="form-input"
-                style={{ padding: "9px 36px 9px 36px", fontSize: 13 }}
-                placeholder="Search name, reg no, email, branch, ticket..."
-                value={studentSearch}
-                onChange={(e) => setStudentSearch(e.target.value)}
-              />
-              <FiSearch
-                size={14}
-                style={{
-                  position: "absolute",
-                  left: 12,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--text-muted)",
-                  pointerEvents: "none",
-                }}
-              />
-              {studentSearch && (
-                <button
-                  type="button"
-                  onClick={() => setStudentSearch("")}
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", flex: "1 1 300px", justifyContent: "flex-end" }}>
+              {/* Multi-Field Search Input with Working Clear Button */}
+              <div style={{ position: "relative", minWidth: 0, flex: "1 1 200px", maxWidth: 380, width: "100%" }}>
+                <input
+                  className="form-input"
+                  style={{ padding: "9px 36px 9px 36px", fontSize: 13 }}
+                  placeholder="Search name, reg no, email, branch, ticket..."
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                />
+                <FiSearch
+                  size={14}
                   style={{
                     position: "absolute",
-                    right: 12,
+                    left: 12,
                     top: "50%",
                     transform: "translateY(-50%)",
-                    background: "none",
-                    border: "none",
                     color: "var(--text-muted)",
-                    cursor: "pointer",
-                    padding: 2,
+                    pointerEvents: "none",
                   }}
-                  title="Clear search"
-                >
-                  <FiX size={15} />
-                </button>
-              )}
+                />
+                {studentSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setStudentSearch("")}
+                    style={{
+                      position: "absolute",
+                      right: 12,
+                      top: "50%",
+                      transform: "translateY(-50)",
+                      background: "none",
+                      border: "none",
+                      color: "var(--text-muted)",
+                      cursor: "pointer",
+                      padding: 2,
+                    }}
+                    title="Clear search"
+                  >
+                    <FiX size={15} />
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => handleExport("filtered")}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}
+                title="Download currently filtered students as official PDF"
+              >
+                <FiDownload size={13} /> Filtered PDF ({filteredRegs.length})
+              </button>
             </div>
           </div>
 
@@ -1534,7 +1617,27 @@ export default function FacultyRegistrations() {
                           )}
                         </td>
                         <td>
-                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                            {/* Download Registration Slip PDF */}
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-sm"
+                              style={{ padding: "4px 8px", fontSize: 11.5, display: "inline-flex", alignItems: "center", gap: 4 }}
+                              onClick={async () => {
+                                try {
+                                  toast.loading("Generating slip PDF...", { id: `slip-${r.id}` });
+                                  await registrationService.downloadSlip(r.id);
+                                  toast.success("Slip PDF downloaded!", { id: `slip-${r.id}` });
+                                } catch (err) {
+                                  console.error("Slip download error:", err);
+                                  toast.error("Could not download slip PDF.", { id: `slip-${r.id}` });
+                                }
+                              }}
+                              title="Download official student registration slip (PDF)"
+                            >
+                              <FiDownload size={11} /> Slip PDF
+                            </button>
+
                             {isPending && (
                               <>
                                 <button

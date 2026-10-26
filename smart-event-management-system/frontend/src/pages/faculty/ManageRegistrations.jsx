@@ -123,23 +123,23 @@ export default function ManageRegistrations() {
     return () => clearInterval(interval);
   }, [selectedEventId, isStaff, isEventManageable]);
 
-  // Keep selectedEventId in sync when user navigates with browser Back/Forward buttons
+  const selectEvent = (id) => {
+    const nextId = id ? String(id) : "";
+    setSelectedEventId(nextId);
+    if (nextId) {
+      setSearchParams({ eventId: nextId }, { replace: true });
+    } else {
+      setSearchParams({}, { replace: true });
+    }
+  };
+
+  // Keep selectedEventId in sync when user navigates with browser Back/Forward or URL changes
   useEffect(() => {
     const qId = searchParams.get("eventId") || "";
     if (qId !== selectedEventId) {
       setSelectedEventId(qId);
     }
   }, [searchParams]);
-
-  // Sync selectedEventId into URL search params without breaking back stack
-  useEffect(() => {
-    const currentQ = searchParams.get("eventId") || "";
-    if (selectedEventId && currentQ !== selectedEventId) {
-      setSearchParams({ eventId: selectedEventId });
-    } else if (!selectedEventId && currentQ) {
-      setSearchParams({});
-    }
-  }, [selectedEventId, setSearchParams, searchParams]);
 
   // Load Registrations for Selected Event
   const loadEventRegistrations = useCallback(
@@ -208,17 +208,12 @@ export default function ManageRegistrations() {
 
   const selectedEvent = events.find((e) => String(e.id) === String(selectedEventId));
 
-  // Registered students roster in Registration Reports — ONLY APPROVED REGISTRATIONS!
-  // Cancelled and pending registrations are strictly excluded from Registration Reports.
-  const allApproved = regs.filter(
-    (r) =>
-      r.status === "approved" ||
-      r.status === "attended" ||
-      r.status === "completed" ||
-      Boolean(r.checked_in_at)
+  // Registered students roster in Registration Reports — Includes all active registrations (registered, approved, attended)
+  const allRegistered = regs.filter(
+    (r) => r.status !== "cancelled"
   );
 
-  const registeredStudents = allApproved.filter((r) => {
+  const registeredStudents = allRegistered.filter((r) => {
     if (!studentSearch.trim()) return true;
     const q = studentSearch.trim().toLowerCase();
     const name = (r.student?.name || r.student_name || "").toLowerCase();
@@ -228,6 +223,7 @@ export default function ManageRegistrations() {
     const sem = String(r.student?.semester || r.semester || "").toLowerCase();
     const cls = (r.student?.class_name || r.class_name || "").toLowerCase();
     const ticket = (r.ticket_code || "").toLowerCase();
+    const st = String(r.status || "").toLowerCase();
 
     return (
       name.includes(q) ||
@@ -236,11 +232,12 @@ export default function ManageRegistrations() {
       dept.includes(q) ||
       sem.includes(q) ||
       cls.includes(q) ||
-      ticket.includes(q)
+      ticket.includes(q) ||
+      st.includes(q)
     );
   });
 
-  // Attended students roster — ONLY APPROVED students with confirmed QR check-in
+  // Attended students roster — confirmed QR check-in
   const allAttended = regs.filter(
     (r) =>
       (r.status === "attended" || r.status === "completed" || Boolean(r.checked_in_at)) &&
@@ -270,15 +267,15 @@ export default function ManageRegistrations() {
   });
 
   const totalCapacity = capacity?.totalCapacity ?? selectedEvent?.total_seats ?? 0;
-  const approvedCount = allApproved.length;
+  const registeredCount = allRegistered.length;
   const attendedCount = allAttended.length;
-  const remainingSeats = Math.max(0, totalCapacity - approvedCount);
+  const remainingSeats = Math.max(0, totalCapacity - registeredCount);
 
-  // PDF Export handlers
-  const handleDownloadRegisteredPDF = () => {
+  // PDF Export handlers with full async support and error handling
+  const handleDownloadRegisteredPDF = async () => {
     if (!selectedEvent) return;
     try {
-      generateRegistrationReportPDF({ event: selectedEvent, registrations: regs });
+      await generateRegistrationReportPDF({ event: selectedEvent, registrations: regs, statusFilter: "active" });
       toast.success("Registration Report PDF downloaded!");
     } catch (err) {
       console.error("PDF download error:", err);
@@ -286,10 +283,10 @@ export default function ManageRegistrations() {
     }
   };
 
-  const handleDownloadAttendedPDF = () => {
+  const handleDownloadAttendedPDF = async () => {
     if (!selectedEvent) return;
     try {
-      generateAttendanceReportPDF({ event: selectedEvent, registrations: regs });
+      await generateAttendanceReportPDF({ event: selectedEvent, registrations: regs });
       toast.success("Attendance Report PDF downloaded!");
     } catch (err) {
       console.error("PDF download error:", err);
@@ -517,7 +514,7 @@ export default function ManageRegistrations() {
                       style={{ width: "100%", justifyContent: "center", gap: 8 }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedEventId(String(ev.id));
+                        selectEvent(ev.id);
                       }}
                     >
                       <FiEye size={14} /> View Registration Report
@@ -547,10 +544,7 @@ export default function ManageRegistrations() {
             <button
               type="button"
               className="btn btn-outline btn-sm"
-              onClick={() => {
-                setSelectedEventId("");
-                setSearchParams({}, { replace: true });
-              }}
+              onClick={() => selectEvent("")}
               style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             >
               <FiArrowLeft size={14} /> Back to All Events
@@ -562,7 +556,7 @@ export default function ManageRegistrations() {
                 className="form-select"
                 style={{ minWidth: 240, maxWidth: 360, fontSize: 13 }}
                 value={selectedEventId}
-                onChange={(e) => setSelectedEventId(e.target.value)}
+                onChange={(e) => selectEvent(e.target.value)}
               >
                 {events.map((ev) => (
                   <option key={ev.id} value={String(ev.id)}>
@@ -843,6 +837,8 @@ export default function ManageRegistrations() {
                     <th>Class / Semester</th>
                     <th>Registration Date</th>
                     <th>Ticket Code</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -850,20 +846,25 @@ export default function ManageRegistrations() {
                     <SkeletonRow />
                   ) : registeredStudents.length === 0 ? (
                     <tr>
-                      <td colSpan={7} style={{ padding: 0 }}>
+                      <td colSpan={9} style={{ padding: 0 }}>
                         <EmptyState
                           icon={<FiUsers />}
-                          title="No approved registrations found"
+                          title="No registrations found"
                           message={
                             studentSearch
-                              ? "No approved students match your current search."
-                              : "No approved students for this event yet. Review student applications in the Registrations dashboard."
+                              ? "No students match your current search query."
+                              : "No students registered for this event yet."
                           }
                         />
                       </td>
                     </tr>
                   ) : (
                     registeredStudents.map((r) => {
+                      const st = String(r.status || "registered").toLowerCase();
+                      const isApproved = st === "approved";
+                      const isAttended = st === "attended" || st === "completed" || Boolean(r.checked_in_at);
+                      const isCancelled = st === "cancelled";
+
                       return (
                         <tr key={r.id}>
                           <td>
@@ -905,6 +906,37 @@ export default function ManageRegistrations() {
                             >
                               {r.ticket_code || "—"}
                             </code>
+                          </td>
+                          <td>
+                            {isAttended ? (
+                              <span className="badge badge-success" style={{ fontSize: 11.5 }}>Attended</span>
+                            ) : isApproved ? (
+                              <span className="badge badge-primary" style={{ fontSize: 11.5 }}>Approved</span>
+                            ) : isCancelled ? (
+                              <span className="badge badge-danger" style={{ fontSize: 11.5 }}>Cancelled</span>
+                            ) : (
+                              <span className="badge badge-warning" style={{ fontSize: 11.5 }}>Registered</span>
+                            )}
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-sm"
+                              style={{ padding: "4px 8px", fontSize: 11.5, display: "inline-flex", alignItems: "center", gap: 4 }}
+                              onClick={async () => {
+                                try {
+                                  toast.loading("Generating slip PDF...", { id: `slip-${r.id}` });
+                                  await registrationService.downloadSlip(r.id);
+                                  toast.success("Slip PDF downloaded!", { id: `slip-${r.id}` });
+                                } catch (err) {
+                                  console.error("Slip download error:", err);
+                                  toast.error("Could not download slip PDF.", { id: `slip-${r.id}` });
+                                }
+                              }}
+                              title="Download official student registration slip (PDF)"
+                            >
+                              <FiDownload size={11} /> Slip PDF
+                            </button>
                           </td>
                         </tr>
                       );

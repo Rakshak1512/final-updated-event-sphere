@@ -121,23 +121,31 @@ const addPageNumbers = (doc) => {
 /**
  * 1. REGISTRATION REPORT PDF (ONLY APPROVED STUDENTS)
  */
-export const generateRegistrationReportPDF = ({ event, registrations }) => {
-  // Filter strictly APPROVED registrations
-  const approvedOnly = (registrations || []).filter(
-    (r) =>
-      r.status === "approved" ||
-      r.status === "attended" ||
-      r.status === "completed" ||
-      Boolean(r.checked_in_at)
-  );
+export const generateRegistrationReportPDF = ({ event, registrations, statusFilter = "active" }) => {
+  // Filter registrations based on statusFilter ("active" by default, or "approved", "all")
+  const targetList = (registrations || []).filter((r) => {
+    const st = String(r.status || "").toLowerCase();
+    if (statusFilter === "approved") {
+      return st === "approved" || st === "attended" || st === "completed" || Boolean(r.checked_in_at);
+    }
+    if (statusFilter === "all") return true;
+    // Default "active": exclude cancelled
+    return st !== "cancelled";
+  });
 
-  const attendedCount = approvedOnly.filter(
+  const totalCount = targetList.length;
+  const approvedCount = targetList.filter(
+    (r) => r.status === "approved" || r.status === "attended" || r.status === "completed"
+  ).length;
+  const attendedCount = targetList.filter(
     (r) => r.status === "attended" || r.status === "completed" || Boolean(r.checked_in_at)
   ).length;
-  const notAttendedCount = Math.max(0, approvedOnly.length - attendedCount);
+  const pendingCount = targetList.filter(
+    (r) => r.status === "registered" || r.status === "pending"
+  ).length;
 
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const startY = drawHeader(doc, "Registration Report", "Official Approved Students Roster", event);
+  const startY = drawHeader(doc, "Registration Report", "Official Event Registrations Roster", event);
 
   // Summary Metrics Bar
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -148,11 +156,13 @@ export const generateRegistrationReportPDF = ({ event, registrations }) => {
   doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(107, 33, 168);
-  doc.text(`Approved Registrations: ${approvedOnly.length}`, 20, startY + 8);
+  doc.text(`Total Registrations: ${totalCount}`, 20, startY + 8);
+  doc.setTextColor(79, 70, 229); // Indigo
+  doc.text(`Approved: ${approvedCount}`, pageWidth / 4 + 10, startY + 8);
   doc.setTextColor(22, 101, 52); // Green
-  doc.text(`Attended: ${attendedCount}`, pageWidth / 2 - 30, startY + 8);
+  doc.text(`Attended: ${attendedCount}`, pageWidth / 2 + 10, startY + 8);
   doc.setTextColor(154, 52, 18); // Amber
-  doc.text(`Not Attended: ${notAttendedCount}`, (pageWidth * 3) / 4 - 30, startY + 8);
+  doc.text(`Pending/Registered: ${pendingCount}`, (pageWidth * 3) / 4 + 5, startY + 8);
 
   // Table Data
   const tableHeaders = [
@@ -165,13 +175,15 @@ export const generateRegistrationReportPDF = ({ event, registrations }) => {
       "Class / Sem",
       "Registration Date",
       "Ticket Code",
+      "Status",
       "Attendance",
     ],
   ];
 
-  const tableBody = approvedOnly.map((r, index) => {
+  const tableBody = targetList.map((r, index) => {
     const isAttended =
       r.status === "attended" || r.status === "completed" || Boolean(r.checked_in_at);
+    const statusText = String(r.status || "registered").toUpperCase();
 
     return [
       index + 1,
@@ -182,13 +194,22 @@ export const generateRegistrationReportPDF = ({ event, registrations }) => {
       r.student?.semester ? `Sem ${r.student.semester}` : "N/A",
       formatDate(r.registered_at),
       r.ticket_code || "N/A",
+      statusText,
       isAttended ? "Attended" : "Not Attended",
     ];
   });
 
   autoTable(doc, {
     head: tableHeaders,
-    body: tableBody,
+    body: tableBody.length > 0 ? tableBody : [
+      [
+        {
+          content: "No student registrations recorded for this event yet.",
+          colSpan: 10,
+          styles: { halign: "center", fontStyle: "italic", textColor: [100, 116, 139] },
+        },
+      ],
+    ],
     startY: startY + 16,
     margin: { left: 14, right: 14 },
     theme: "grid",
@@ -206,24 +227,35 @@ export const generateRegistrationReportPDF = ({ event, registrations }) => {
     },
     columnStyles: {
       0: { cellWidth: 12, halign: "center" },
-      1: { cellWidth: 42 },
+      1: { cellWidth: 38 },
       2: { cellWidth: 26, halign: "center", fontStyle: "bold" },
-      3: { cellWidth: 48 },
-      4: { cellWidth: 32 },
-      5: { cellWidth: 22, halign: "center" },
-      6: { cellWidth: 28, halign: "center" },
-      7: { cellWidth: 28, halign: "center" },
+      3: { cellWidth: 44 },
+      4: { cellWidth: 28 },
+      5: { cellWidth: 20, halign: "center" },
+      6: { cellWidth: 26, halign: "center" },
+      7: { cellWidth: 26, halign: "center" },
       8: { cellWidth: 24, halign: "center", fontStyle: "bold" },
+      9: { cellWidth: 22, halign: "center" },
     },
     alternateRowStyles: {
       fillColor: [248, 250, 252],
     },
     didParseCell: function (data) {
-      if (data.section === "body" && data.column.index === 8) {
+      if (data.section === "body" && data.column.index === 9) {
         if (data.cell.raw === "Attended") {
           data.cell.styles.textColor = [22, 101, 52];
+          data.cell.styles.fontStyle = "bold";
         } else {
           data.cell.styles.textColor = [156, 163, 175];
+        }
+      }
+      if (data.section === "body" && data.column.index === 8) {
+        if (data.cell.raw === "APPROVED" || data.cell.raw === "ATTENDED") {
+          data.cell.styles.textColor = [22, 101, 52];
+        } else if (data.cell.raw === "CANCELLED") {
+          data.cell.styles.textColor = [220, 38, 38];
+        } else {
+          data.cell.styles.textColor = [180, 83, 9];
         }
       }
     },
