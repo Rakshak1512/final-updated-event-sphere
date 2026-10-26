@@ -18,9 +18,13 @@ export function SkeletonRow() {
   );
 }
 
-export function SkeletonGrid({ count = 6 }) {
+export function SkeletonGrid({ count = 6, columns, className = "grid-cards", style = {} }) {
+  const gridStyle = columns
+    ? { display: "grid", gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: 16, ...style }
+    : style;
+
   return (
-    <div className="grid-cards">
+    <div className={className} style={gridStyle}>
       {Array.from({ length: count }).map((_, i) => (
         <SkeletonCard key={i} />
       ))}
@@ -79,3 +83,8 @@ export default function PageLoader() {
     </div>
   );
 }
+
+PageLoader.SkeletonGrid = SkeletonGrid;
+PageLoader.SkeletonCard = SkeletonCard;
+PageLoader.SkeletonRow = SkeletonRow;
+PageLoader.Spinner = Spinner;

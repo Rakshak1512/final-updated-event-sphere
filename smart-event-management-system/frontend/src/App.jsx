@@ -88,6 +88,7 @@ export default function App() {
             <Route path="events" element={<EventsBrowse embedded={true} />} />
             <Route path="events/:id" element={<EventDetail embedded={true} />} />
             <Route path="my-registrations" element={<MyRegistrations />} />
+            <Route path="registrations" element={<Navigate to="my-registrations" replace />} />
             <Route path="certificates" element={<StudentCertificates />} />
             <Route path="notifications" element={<Notifications />} />
             <Route path="profile" element={<Profile />} />
