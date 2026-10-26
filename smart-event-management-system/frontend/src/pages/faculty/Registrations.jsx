@@ -20,6 +20,7 @@ import {
   FiLayers,
   FiFilter,
   FiArrowRight,
+  FiFileText,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import Modal from "../../components/ui/Modal.jsx";
@@ -141,9 +142,13 @@ export default function FacultyRegistrations() {
         }
         if (evRes.status === "fulfilled" && evRes.value.data) {
           const freshEv = evRes.value.data;
-          setEvents((prev) =>
-            prev.map((e) => (String(e.id) === String(selectedEventId) ? { ...e, ...freshEv } : e))
-          );
+          setEvents((prev) => {
+            const exists = prev.some((e) => String(e.id) === String(freshEv.id));
+            if (exists) {
+              return prev.map((e) => (String(e.id) === String(freshEv.id) ? { ...e, ...freshEv } : e));
+            }
+            return [freshEv, ...prev];
+          });
         }
       } catch (err) {
         console.error("Registrations load error:", err);
@@ -711,7 +716,7 @@ export default function FacultyRegistrations() {
           </div>
 
           {/* Selected Event Details Header Card */}
-          {selectedEvent && (
+          {selectedEvent ? (
             <div
               className="glass-card float-card"
               style={{
@@ -881,6 +886,23 @@ export default function FacultyRegistrations() {
                   </div>
                 </div>
               </div>
+            </div>
+          ) : (
+            <div
+              className="glass-card"
+              style={{
+                padding: "20px 24px",
+                marginBottom: 24,
+                borderRadius: "22px",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                color: "var(--text-secondary)",
+                fontSize: 13.5,
+              }}
+            >
+              <FiRefreshCw className="spin" size={16} color="#8b5cf6" />
+              <span>Loading event metadata and registrations...</span>
             </div>
           )}
 

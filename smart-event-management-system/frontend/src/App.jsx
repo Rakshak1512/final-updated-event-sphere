@@ -6,6 +6,7 @@ import ProtectedRoute from "./components/common/ProtectedRoute.jsx";
 import DashboardLayout from "./components/layout/DashboardLayout.jsx";
 import Loader from "./components/ui/Loader.jsx";
 import PullToRefresh from "./components/common/PullToRefresh.jsx";
+import ErrorBoundary from "./components/common/ErrorBoundary.jsx";
 
 // Core landing & auth pages loaded directly for instant initial paint
 import Home from "./pages/landing/Home.jsx";
@@ -61,7 +62,8 @@ export default function App() {
           },
         }}
       />
-      <Suspense fallback={<Loader />}>
+      <ErrorBoundary>
+        <Suspense fallback={<Loader />}>
       <Routes>
         {/* Continuous Single-Page Landing Experience */}
         <Route path="/" element={<Home />} />
@@ -154,7 +156,8 @@ export default function App() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      </Suspense>
+        </Suspense>
+      </ErrorBoundary>
     </>
   );
 }

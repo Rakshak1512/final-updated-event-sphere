@@ -45,7 +45,8 @@ const emptyForm = {
 
 export default function ManageEvents() {
   const { user } = useAuth();
-  const regBasePath = user?.role === "admin" ? "/admin/registrations" : "/faculty/registrations";
+  const isAdmin = (user?.role || "").toLowerCase() === "admin";
+  const regBasePath = isAdmin ? "/admin/registrations" : "/faculty/registrations";
   const [events, setEvents] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -318,8 +319,8 @@ export default function ManageEvents() {
                       <FiEdit2 size={13} /> Edit
                     </button>
                     <Link
-                      to={`${user?.role === "admin" ? "/admin/events" : "/faculty/events"}/${ev.id}/report`}
-                      state={{ from: user?.role === "admin" ? "/admin/events" : "/faculty/events" }}
+                      to={`${isAdmin ? "/admin/events" : "/faculty/events"}/${ev.id}/report`}
+                      state={{ from: isAdmin ? "/admin/events" : "/faculty/events" }}
                       className="btn btn-outline btn-sm"
                       title="View Dedicated Event Review Report & Download PDF"
                       style={{ color: "#a855f7", borderColor: "rgba(168, 85, 247, 0.4)", display: "inline-flex", alignItems: "center", gap: 6 }}
@@ -331,7 +332,7 @@ export default function ManageEvents() {
                     </button>
                     <Link
                       to={`${regBasePath}?eventId=${ev.id}`}
-                      state={{ eventId: ev.id, from: user?.role === "admin" ? "/admin/events" : "/faculty/events" }}
+                      state={{ eventId: ev.id, from: isAdmin ? "/admin/events" : "/faculty/events" }}
                       className="btn btn-outline btn-sm"
                       title="Manage Event Registrations & Attendee Roster"
                       style={{ color: "#38bdf8", borderColor: "rgba(56, 189, 248, 0.4)" }}

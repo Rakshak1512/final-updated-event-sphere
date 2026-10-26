@@ -19,6 +19,8 @@ import {
 import Sidebar from "./Sidebar.jsx";
 import Topbar from "./Topbar.jsx";
 import EventSphereAIChatbot from "../chatbot/EventSphereAIChatbot.jsx";
+import ErrorBoundary from "../common/ErrorBoundary.jsx";
+import Loader from "../ui/Loader.jsx";
 
 const studentItems = (base) => [
   { to: `${base}/dashboard`, label: "Home", icon: FiHome, end: true },
@@ -68,11 +70,20 @@ const volunteerItems = (base) => [
 ];
 
 export default function DashboardLayout({ role }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const userRole = (user?.role || "").toLowerCase();
-  if (userRole && userRole !== role.toLowerCase()) {
+  if (loading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <Loader />
+      </div>
+    );
+  }
+
+  const userRole = (user?.role || "").toLowerCase().trim();
+  const layoutRole = (role || "").toLowerCase().trim();
+  if (userRole && userRole !== layoutRole) {
     const dest =
       userRole === "admin"
         ? "/admin/dashboard"
@@ -175,7 +186,9 @@ export default function DashboardLayout({ role }) {
       >
         <Topbar onMenuClick={() => setSidebarOpen(true)} basePath={basePath} />
         <main className="dashboard-main">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
 

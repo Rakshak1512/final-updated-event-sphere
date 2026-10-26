@@ -393,10 +393,10 @@ export default function EventDetail({ embedded = false }) {
                   View Digital Pass / QR
                 </button>
               </div>
-            ) : user && (user.role === "faculty" || user.role === "admin") ? (
+            ) : user && (["faculty", "admin"].includes((user.role || "").toLowerCase())) ? (
               <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
                 <Link
-                  to={`${user.role === "admin" ? "/admin/events" : "/faculty/events"}/${event.id}/report`}
+                  to={`${(user.role || "").toLowerCase() === "admin" ? "/admin/events" : "/faculty/events"}/${event.id}/report`}
                   state={{ from: location.pathname }}
                   className="btn btn-primary"
                   style={{
@@ -411,7 +411,7 @@ export default function EventDetail({ embedded = false }) {
                   <FiFileText size={16} /> Review Report
                 </Link>
                 <Link
-                  to={`${user.role === "admin" ? "/admin/registrations" : "/faculty/registrations"}?eventId=${event.id}`}
+                  to={`${(user.role || "").toLowerCase() === "admin" ? "/admin/registrations" : "/faculty/registrations"}?eventId=${event.id}`}
                   state={{ eventId: event.id, from: location.pathname }}
                   className="btn btn-outline"
                   style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
@@ -419,7 +419,7 @@ export default function EventDetail({ embedded = false }) {
                   <FiUsers size={16} /> Manage Registrations
                 </Link>
                 <Link
-                  to={user.role === "faculty" ? "/faculty/events" : "/admin/events"}
+                  to={(user.role || "").toLowerCase() === "faculty" ? "/faculty/events" : "/admin/events"}
                   className="btn btn-outline"
                   style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
                 >
