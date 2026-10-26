@@ -190,13 +190,15 @@ export default function VolunteerDashboard() {
   const { user } = useAuth();
 
   const userRole = (user?.role || "").toLowerCase().trim();
-  if (userRole && userRole !== "volunteer") {
+  if (!user || userRole !== "volunteer") {
     const target =
       userRole === "admin"
         ? "/admin/dashboard"
         : userRole === "faculty"
         ? "/faculty/dashboard"
-        : "/student/dashboard";
+        : userRole === "student"
+        ? "/student/dashboard"
+        : "/login";
     return <Navigate to={target} replace />;
   }
 

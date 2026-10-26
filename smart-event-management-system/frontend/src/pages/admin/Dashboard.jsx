@@ -28,13 +28,15 @@ export default function AdminDashboard() {
   const { user } = useAuth();
 
   const userRole = (user?.role || "").toLowerCase().trim();
-  if (userRole && userRole !== "admin") {
+  if (!user || userRole !== "admin") {
     const target =
       userRole === "faculty"
         ? "/faculty/dashboard"
         : userRole === "volunteer"
         ? "/volunteer/dashboard"
-        : "/student/dashboard";
+        : userRole === "student"
+        ? "/student/dashboard"
+        : "/login";
     return <Navigate to={target} replace />;
   }
 

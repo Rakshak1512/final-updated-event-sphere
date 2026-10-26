@@ -30,13 +30,15 @@ export default function FacultyDashboard() {
   const { user } = useAuth();
 
   const userRole = (user?.role || "").toLowerCase().trim();
-  if (userRole && userRole !== "faculty") {
+  if (!user || userRole !== "faculty") {
     const target =
       userRole === "admin"
         ? "/admin/dashboard"
         : userRole === "volunteer"
         ? "/volunteer/dashboard"
-        : "/student/dashboard";
+        : userRole === "student"
+        ? "/student/dashboard"
+        : "/login";
     return <Navigate to={target} replace />;
   }
 

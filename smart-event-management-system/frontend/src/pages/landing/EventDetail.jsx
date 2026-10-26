@@ -395,9 +395,10 @@ export default function EventDetail({ embedded = false }) {
               </div>
             ) : user && (user.role === "faculty" || user.role === "admin") ? (
               <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
-                <button
+                <Link
+                  to={`${user.role === "admin" ? "/admin/events" : "/faculty/events"}/${event.id}/report`}
+                  state={{ from: location.pathname }}
                   className="btn btn-primary"
-                  onClick={() => setReportModalOpen(true)}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -407,8 +408,8 @@ export default function EventDetail({ embedded = false }) {
                     boxShadow: "0 4px 14px rgba(139, 92, 246, 0.35)",
                   }}
                 >
-                  <FiFileText size={16} /> View Review Report
-                </button>
+                  <FiFileText size={16} /> Review Report
+                </Link>
                 <Link
                   to={`${user.role === "admin" ? "/admin/registrations" : "/faculty/registrations"}?eventId=${event.id}`}
                   state={{ eventId: event.id, from: location.pathname }}

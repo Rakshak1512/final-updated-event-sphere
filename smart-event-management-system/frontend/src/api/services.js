@@ -40,7 +40,8 @@ export const eventService = {
       responseType: "blob",
     });
     const sanitizedTitle = (eventTitle || "Event").replace(/[^a-zA-Z0-9_-]/g, "_");
-    const filename = `EventSphere_Event_Report_${sanitizedTitle}_${id.substring(0, 8)}.pdf`;
+    const safeIdStr = String(id || "0").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const filename = `EventSphere_Review_Report_${sanitizedTitle}_${safeIdStr}.pdf`;
     await downloadBlobOrFile(response.data, filename, "application/pdf");
     return { success: true, data: response.data };
   },

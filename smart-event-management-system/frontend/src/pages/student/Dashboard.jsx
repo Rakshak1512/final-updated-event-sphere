@@ -16,13 +16,15 @@ export default function StudentDashboard() {
   const { user } = useAuth();
 
   const userRole = (user?.role || "").toLowerCase().trim();
-  if (userRole && userRole !== "student") {
+  if (!user || userRole !== "student") {
     const target =
       userRole === "admin"
         ? "/admin/dashboard"
         : userRole === "faculty"
         ? "/faculty/dashboard"
-        : "/volunteer/dashboard";
+        : userRole === "volunteer"
+        ? "/volunteer/dashboard"
+        : "/login";
     return <Navigate to={target} replace />;
   }
 

@@ -40,6 +40,7 @@ const AdminAssignments = lazy(() => import("./pages/admin/Assignments.jsx"));
 const AdminReports = lazy(() => import("./pages/admin/Reports.jsx"));
 
 const VolunteerDashboard = lazy(() => import("./pages/volunteer/VolunteerDashboard.jsx"));
+const EventReviewReport = lazy(() => import("./pages/events/EventReviewReport.jsx"));
 
 const Notifications = lazy(() => import("./pages/shared/Notifications.jsx"));
 const Profile = lazy(() => import("./pages/shared/Profile.jsx"));
@@ -102,6 +103,7 @@ export default function App() {
             <Route path="approvals" element={<FacultyStudentApprovals />} />
             <Route path="events" element={<ManageEvents />} />
             <Route path="events/:id" element={<EventDetail embedded={true} />} />
+            <Route path="events/:id/report" element={<EventReviewReport />} />
             <Route path="registrations" element={<FacultyRegistrations />} />
             <Route path="registration-reports" element={<ManageRegistrations />} />
             <Route path="reports" element={<ManageRegistrations />} />
@@ -126,6 +128,7 @@ export default function App() {
             <Route path="assignments" element={<AdminAssignments />} />
             <Route path="events" element={<ManageEvents />} />
             <Route path="events/:id" element={<EventDetail embedded={true} />} />
+            <Route path="events/:id/report" element={<EventReviewReport />} />
             <Route path="registrations" element={<FacultyRegistrations />} />
             <Route path="registration-reports" element={<ManageRegistrations />} />
             <Route path="reports" element={<AdminReports />} />

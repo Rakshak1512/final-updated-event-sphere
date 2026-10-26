@@ -302,11 +302,11 @@ export default function Sidebar({ items, role, open, onClose }) {
                   textOverflow: "ellipsis",
                 }}
               >
-                {role === "admin" || user?.role === "admin"
+                {((role || user?.role || "").toLowerCase() === "admin")
                   ? "Admin Portal"
-                  : isFaculty
+                  : ((role || user?.role || "").toLowerCase() === "faculty")
                   ? "Faculty Portal"
-                  : user?.role === "volunteer"
+                  : ((role || user?.role || "").toLowerCase() === "volunteer")
                   ? "Volunteer Desk"
                   : "Student Portal"}
               </div>
@@ -319,9 +319,9 @@ export default function Sidebar({ items, role, open, onClose }) {
                   textOverflow: "ellipsis",
                 }}
               >
-                {role === "admin" || user?.role === "admin"
+                {((role || user?.role || "").toLowerCase() === "admin")
                   ? "Principal & Administration"
-                  : user?.department || (user?.role === "volunteer" ? "Attendance & Check-in" : "Department Portal")}
+                  : user?.department || ((role || user?.role || "").toLowerCase() === "volunteer" ? "Attendance & Check-in" : "Department Portal")}
               </div>
             </div>
           </div>
