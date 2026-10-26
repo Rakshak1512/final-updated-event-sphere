@@ -24,6 +24,7 @@ import { fileUrl, formatDate, statusBadgeClass } from "../../utils/format.js";
 import QRCodeDisplay from "../../components/common/QRCodeDisplay.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useRealtime } from "../../context/RealtimeContext.jsx";
+import BackButton from "../../components/common/BackButton.jsx";
 
 export default function MyRegistrations() {
   const { user } = useAuth();
@@ -163,6 +164,10 @@ export default function MyRegistrations() {
 
   return (
     <div>
+      <div style={{ marginBottom: 14 }}>
+        <BackButton fallback="/student/dashboard" label="Back to Dashboard" />
+      </div>
+
       <div
         style={{
           display: "flex",
@@ -221,7 +226,7 @@ export default function MyRegistrations() {
               )}
             </div>
           )}
-          <button className="btn btn-outline btn-sm" onClick={load} disabled={loading}>
+          <button type="button" className="btn btn-outline btn-sm" onClick={load} disabled={loading}>
             <FiRefreshCw className={loading ? "spin" : ""} /> Refresh
           </button>
         </div>
@@ -305,10 +310,19 @@ export default function MyRegistrations() {
             {errorMessage || "Unable to connect to the EventSphere server. Please verify your connection."}
           </p>
           <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-            <button className="btn btn-primary" onClick={load}>
-              <FiRefreshCw /> Try Again
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={load}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <FiRefreshCw size={14} /> Try Again
             </button>
-            <button className="btn btn-outline" onClick={() => window.location.reload()}>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => window.location.reload()}
+            >
               Reload Page
             </button>
             <Link to="/student/dashboard" className="btn btn-outline">
@@ -333,6 +347,7 @@ export default function MyRegistrations() {
             No registrations matched your search or active filter.
           </p>
           <button
+            type="button"
             className="btn btn-outline btn-sm"
             onClick={() => {
               setSearchQuery("");
@@ -466,6 +481,7 @@ export default function MyRegistrations() {
                   }}
                 >
                   <button
+                    type="button"
                     className="btn btn-primary btn-sm"
                     style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
                     onClick={() => setQrModal(r)}
@@ -476,6 +492,7 @@ export default function MyRegistrations() {
                   </button>
 
                   <button
+                    type="button"
                     className="btn btn-outline btn-sm"
                     onClick={() => handleDownloadSlip(r.id)}
                     title="Download Registration Slip (PDF)"
@@ -486,6 +503,7 @@ export default function MyRegistrations() {
 
                   {!isCancelled && !isAttended && (
                     <button
+                      type="button"
                       className="btn btn-sm"
                       style={{
                         background: "rgba(220, 38, 38, 0.1)",
@@ -589,6 +607,7 @@ export default function MyRegistrations() {
             </div>
 
             <button
+              type="button"
               className="btn btn-primary"
               style={{ width: "100%" }}
               onClick={() => handleDownloadSlip(qrModal.id)}
@@ -613,6 +632,7 @@ export default function MyRegistrations() {
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <button
+            type="button"
             className="btn btn-outline"
             onClick={() => setCancelTarget(null)}
             disabled={cancelling}
@@ -620,6 +640,7 @@ export default function MyRegistrations() {
             Keep Registration
           </button>
           <button
+            type="button"
             className="btn btn-danger"
             onClick={handleCancel}
             disabled={cancelling}
