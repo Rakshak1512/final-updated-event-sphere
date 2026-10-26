@@ -887,6 +887,55 @@ def generate_event_report_pdf(report_data: dict) -> bytes:
         story.append(branch_table)
         story.append(Spacer(1, 4 * mm))
 
+    # 4b. Event Feedback & Student Review Summary
+    feedback = report_data.get("feedback")
+    if feedback and feedback.get("total_responses", 0) > 0:
+        avg_r = feedback.get("average_rating", 5.0)
+        tot_r = feedback.get("total_responses", 0)
+        fb_para = Paragraph(
+            f"<b>Participant Feedback & Sentiment:</b> Average Rating <font color='#d97706'><b>★ {avg_r} / 5.0</b></font> ({tot_r} verified review{'s' if tot_r != 1 else ''})",
+            styles["cell_bold"]
+        )
+        story.append(fb_para)
+        story.append(Spacer(1, 1.5 * mm))
+
+        recent_fb = feedback.get("recent_feedback", [])
+        if recent_fb:
+            fb_rows = [
+                [
+                    Paragraph("<b>Student</b>", styles["th"]),
+                    Paragraph("<b>Rating</b>", styles["th"]),
+                    Paragraph("<b>Review & Comments</b>", styles["th"]),
+                    Paragraph("<b>Date</b>", styles["th"]),
+                ]
+            ]
+            for f_item in recent_fb[:4]:
+                r_val = int(f_item.get("rating", 5))
+                f_stars = "★" * r_val + "☆" * (5 - r_val)
+                f_date = str(f_item.get("created_at", ""))[:10]
+                fb_rows.append([
+                    Paragraph(str(f_item.get("student_name", "Student")), styles["cell_bold"]),
+                    Paragraph(f"<font color='#d97706'><b>{f_stars}</b></font>", styles["cell"]),
+                    Paragraph(str(f_item.get("comments") or "Great event and well coordinated!"), styles["cell"]),
+                    Paragraph(f_date or "—", styles["cell_muted"]),
+                ])
+            fb_table = Table(fb_rows, colWidths=[55 * mm, 35 * mm, 144 * mm, 35 * mm])
+            fb_t_style = [
+                ("BACKGROUND", (0, 0), (-1, 0), HexColor("#312e81")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("BOX", (0, 0), (-1, -1), 0.5, HexColor("#cbd5e1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, HexColor("#e2e8f0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]
+            for i in range(1, len(fb_rows)):
+                fb_t_style.append(("BACKGROUND", (0, i), (-1, i), HexColor("#f8fafc") if i % 2 == 0 else colors.white))
+            fb_table.setStyle(TableStyle(fb_t_style))
+            story.append(fb_table)
+            story.append(Spacer(1, 4 * mm))
+
     # 5. Full Attendee Registration & Attendance Roster
     story.append(Paragraph(f"<b>Attendee Roster & Attendance Verification Log ({len(attendees)} Total)</b>", styles["cell_bold"]))
     story.append(Spacer(1, 1.5 * mm))

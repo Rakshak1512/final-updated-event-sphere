@@ -60,10 +60,11 @@ export default function AdminAnalyticsDashboard() {
   const [selectedEventReport, setSelectedEventReport] = useState(null);
   const [timeRange, setTimeRange] = useState("all");
 
-  const fetchAnalytics = async (isManual = false) => {
+  const fetchAnalytics = async (isManual = false, range = timeRange) => {
     if (isManual) setRefreshing(true);
     try {
-      const { data } = await analyticsService.admin();
+      const params = range && range !== "all" ? { time_range: range } : {};
+      const { data } = await analyticsService.admin(params);
       setAnalytics(data);
       setLastUpdated(new Date());
     } catch (err) {
@@ -74,14 +75,19 @@ export default function AdminAnalyticsDashboard() {
     }
   };
 
+  const handleTimeRangeChange = (newRange) => {
+    setTimeRange(newRange);
+    fetchAnalytics(true, newRange);
+  };
+
   useEffect(() => {
     fetchAnalytics();
     // Real-time polling every 25 seconds as backup
     const interval = setInterval(() => {
-      fetchAnalytics();
+      fetchAnalytics(false, timeRange);
     }, 25000);
     return () => clearInterval(interval);
-  }, []);
+  }, [timeRange]);
 
   // Reactive real-time websocket synchronization
   useEffect(() => {
@@ -295,6 +301,46 @@ export default function AdminAnalyticsDashboard() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            {/* Time Range Filter Pills */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                background: "rgba(255, 255, 255, 0.05)",
+                padding: "3px 4px",
+                borderRadius: "10px",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+              }}
+            >
+              {[
+                { id: "all", label: "All Time" },
+                { id: "30d", label: "30 Days" },
+                { id: "7d", label: "7 Days" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTimeRangeChange(tab.id)}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: "7px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    border: "none",
+                    cursor: "pointer",
+                    background:
+                      timeRange === tab.id
+                        ? "linear-gradient(135deg, #6366f1, #a855f7)"
+                        : "transparent",
+                    color: timeRange === tab.id ? "#ffffff" : "#94a3b8",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
             {lastUpdated && (
               <span style={{ fontSize: "12px", color: "#94a3b8" }}>
                 Synced: <strong style={{ color: "#e2e8f0" }}>{lastUpdated.toLocaleTimeString()}</strong>

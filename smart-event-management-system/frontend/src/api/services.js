@@ -171,7 +171,7 @@ export const notificationService = {
 
 /* ---------------- Analytics ---------------- */
 export const analyticsService = {
-  admin: () => api.get("/analytics/admin"),
+  admin: (params) => api.get("/analytics/admin", { params }),
   student: () => api.get("/analytics/student"),
   faculty: () => api.get("/analytics/faculty"),
 };

@@ -28,6 +28,7 @@ import { useRealtime } from "../../context/RealtimeContext.jsx";
 import { fileUrl, formatDate } from "../../utils/format.js";
 import EventImage from "../../components/common/EventImage.jsx";
 import QRCodeDisplay from "../../components/common/QRCodeDisplay.jsx";
+import EventReportModal from "../../components/events/EventReportModal.jsx";
 
 export default function EventDetail({ embedded = false }) {
   const { id } = useParams();
@@ -39,6 +40,7 @@ export default function EventDetail({ embedded = false }) {
   const [registration, setRegistration] = useState(null);
   const [myTeam, setMyTeam] = useState(null);
   const [qrModal, setQrModal] = useState(null);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
 
   // Team Registration Modal State
   const [teamModalOpen, setTeamModalOpen] = useState(false);
@@ -391,20 +393,42 @@ export default function EventDetail({ embedded = false }) {
                   View Digital Pass / QR
                 </button>
               </div>
+            ) : user && (user.role === "faculty" || user.role === "admin") ? (
+              <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setReportModalOpen(true)}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: "linear-gradient(135deg, #8b5cf6, #ec4899)",
+                    border: "none",
+                    boxShadow: "0 4px 14px rgba(139, 92, 246, 0.35)",
+                  }}
+                >
+                  <FiFileText size={16} /> View Review Report
+                </button>
+                <Link
+                  to={user.role === "faculty" ? "/faculty/events" : "/admin/events"}
+                  className="btn btn-outline"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+                >
+                  Manage All Events
+                </Link>
+              </div>
             ) : (
               <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
                 {event.registration_type !== "team" && (
                   <button
                     className="btn btn-primary"
-                    disabled={event.available_seats <= 0 || registering || user?.role === "faculty"}
+                    disabled={event.available_seats <= 0 || registering}
                     onClick={handleRegisterIndividual}
                   >
                     {event.available_seats <= 0
                       ? "Fully Booked"
                       : registering
                       ? "Registering..."
-                      : user?.role === "faculty"
-                      ? "Faculty cannot register"
                       : "Register Individually"}
                   </button>
                 )}
@@ -412,7 +436,7 @@ export default function EventDetail({ embedded = false }) {
                 {event.registration_type !== "individual" && (
                   <button
                     className="btn btn-outline"
-                    disabled={event.available_seats <= 0 || registering || user?.role === "faculty"}
+                    disabled={event.available_seats <= 0 || registering}
                     onClick={openTeamModal}
                     style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
                   >
@@ -568,6 +592,14 @@ export default function EventDetail({ embedded = false }) {
           </div>
         )}
       </Modal>
+
+      {/* EVENT REVIEW REPORT MODAL */}
+      <EventReportModal
+        isOpen={reportModalOpen}
+        eventId={event?.id}
+        eventTitle={event?.title}
+        onClose={() => setReportModalOpen(false)}
+      />
     </>
   );
 

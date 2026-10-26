@@ -5,6 +5,8 @@ from app.dependencies import require_role
 from app.models.user import RoleEnum, User
 from app.schemas.analytics_schema import FacultyAnalytics, StudentAnalytics
 
+from typing import Optional
+
 router = APIRouter(prefix="/api/analytics", tags=["Analytics"])
 
 
@@ -31,8 +33,10 @@ def faculty_analytics(
 
 @router.get("/admin")
 def admin_analytics(
+    time_range: Optional[str] = None,
+    event_id: Optional[int] = None,
     current_user: User = Depends(require_role(RoleEnum.admin)),
 ):
-    data = db_service.get_admin_analytics()
+    data = db_service.get_admin_analytics(time_range=time_range, event_id=event_id)
     return data
 

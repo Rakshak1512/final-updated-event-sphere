@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, Navigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext.jsx";
 import {
   FiHome,
   FiCalendar,
@@ -66,7 +67,22 @@ const volunteerItems = (base) => [
 ];
 
 export default function DashboardLayout({ role }) {
+  const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const userRole = (user?.role || "").toLowerCase();
+  if (userRole && userRole !== role.toLowerCase()) {
+    const dest =
+      userRole === "admin"
+        ? "/admin/dashboard"
+        : userRole === "faculty"
+        ? "/faculty/dashboard"
+        : userRole === "volunteer"
+        ? "/volunteer/dashboard"
+        : "/student/dashboard";
+    return <Navigate to={dest} replace />;
+  }
+
   const basePath =
     role === "admin"
       ? "/admin"

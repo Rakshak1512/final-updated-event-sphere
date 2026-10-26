@@ -161,6 +161,12 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("sems-access-token");
     localStorage.removeItem("sems-refresh-token");
     localStorage.removeItem("sems-user");
+    try {
+      sessionStorage.clear();
+      delete api.defaults.headers.common["Authorization"];
+    } catch {
+      // Storage access errors safely caught
+    }
     setUser(null);
   };
 

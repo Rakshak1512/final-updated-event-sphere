@@ -68,21 +68,28 @@ export default function EventReportModal({ eventId, eventTitle, isOpen, onClose 
 
   const eventData = report?.event || {};
   const summary = report?.summary || {};
-  const departmentBreakdown = report?.department_breakdown || [];
+  const departmentBreakdown = report?.branch_breakdown || report?.department_breakdown || [];
   const attendees = report?.attendees || [];
+  const feedback = report?.feedback;
 
   const filteredAttendees = attendees.filter((a) => {
+    const name = a.student_name || a.user_name || "";
+    const email = a.email || a.user_email || "";
+    const regNo = a.registration_number || "";
+    const dept = a.department || "";
+
     const matchesSearch =
       !attendeeSearch ||
-      a.user_name?.toLowerCase().includes(attendeeSearch.toLowerCase()) ||
-      a.user_email?.toLowerCase().includes(attendeeSearch.toLowerCase()) ||
-      a.registration_number?.toLowerCase().includes(attendeeSearch.toLowerCase()) ||
-      a.department?.toLowerCase().includes(attendeeSearch.toLowerCase());
+      name.toLowerCase().includes(attendeeSearch.toLowerCase()) ||
+      email.toLowerCase().includes(attendeeSearch.toLowerCase()) ||
+      regNo.toLowerCase().includes(attendeeSearch.toLowerCase()) ||
+      dept.toLowerCase().includes(attendeeSearch.toLowerCase());
 
+    const isPresent = a.attendance_status === "Present" || a.attended;
     const matchesStatus =
       statusFilter === "all" ||
-      (statusFilter === "attended" && a.attended) ||
-      (statusFilter === "not_attended" && !a.attended) ||
+      (statusFilter === "attended" && isPresent) ||
+      (statusFilter === "not_attended" && !isPresent) ||
       (statusFilter === a.status);
 
     return matchesSearch && matchesStatus;
@@ -133,7 +140,7 @@ export default function EventReportModal({ eventId, eventTitle, isOpen, onClose 
               </div>
               <div>
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  Event Comprehensive Report
+                  Event Review Report
                   <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-violet-500/20 text-violet-300 border border-violet-500/30">
                     Live Database Record
                   </span>
@@ -248,9 +255,9 @@ export default function EventReportModal({ eventId, eventTitle, isOpen, onClose 
                       <span>Total Registered</span>
                       <FiUsers className="text-violet-400" />
                     </div>
-                    <div className="text-2xl font-bold text-white">{summary.total_registrations || 0}</div>
+                    <div className="text-2xl font-bold text-white">{summary.total_registrations ?? 0}</div>
                     <div className="text-[11px] text-slate-400 mt-0.5">
-                      of {eventData.capacity || "—"} seats
+                      of {eventData.total_seats || eventData.capacity || "—"} seats
                     </div>
                   </div>
 
@@ -259,7 +266,9 @@ export default function EventReportModal({ eventId, eventTitle, isOpen, onClose 
                       <span>Confirmed</span>
                       <FiCheckCircle className="text-emerald-400" />
                     </div>
-                    <div className="text-2xl font-bold text-emerald-400">{summary.confirmed_count || 0}</div>
+                    <div className="text-2xl font-bold text-emerald-400">
+                      {summary.confirmed_registrations ?? summary.confirmed_count ?? 0}
+                    </div>
                     <div className="text-[11px] text-slate-400 mt-0.5">Approved seats</div>
                   </div>
 
@@ -268,7 +277,9 @@ export default function EventReportModal({ eventId, eventTitle, isOpen, onClose 
                       <span>Pending</span>
                       <FiClock className="text-amber-400" />
                     </div>
-                    <div className="text-2xl font-bold text-amber-400">{summary.pending_count || 0}</div>
+                    <div className="text-2xl font-bold text-amber-400">
+                      {summary.pending_registrations ?? summary.pending_count ?? 0}
+                    </div>
                     <div className="text-[11px] text-slate-400 mt-0.5">Awaiting check</div>
                   </div>
 
@@ -277,7 +288,9 @@ export default function EventReportModal({ eventId, eventTitle, isOpen, onClose 
                       <span>Present</span>
                       <FiCheckSquare className="text-cyan-400" />
                     </div>
-                    <div className="text-2xl font-bold text-cyan-400">{summary.present_count || 0}</div>
+                    <div className="text-2xl font-bold text-cyan-400">
+                      {summary.present_attendees ?? summary.present_count ?? summary.total_attendance ?? 0}
+                    </div>
                     <div className="text-[11px] text-slate-400 mt-0.5">Checked in</div>
                   </div>
 
@@ -286,9 +299,9 @@ export default function EventReportModal({ eventId, eventTitle, isOpen, onClose 
                       <span>Attendance Rate</span>
                       <FiTrendingUp className="text-pink-400" />
                     </div>
-                    <div className="text-2xl font-bold text-pink-400">{summary.attendance_rate || 0}%</div>
+                    <div className="text-2xl font-bold text-pink-400">{summary.attendance_rate ?? 0}%</div>
                     <div className="text-[11px] text-slate-400 mt-0.5">
-                      {summary.present_count || 0}/{summary.total_registrations || 0}
+                      {summary.present_attendees ?? summary.present_count ?? 0}/{summary.total_registrations ?? 0}
                     </div>
                   </div>
 
@@ -297,10 +310,53 @@ export default function EventReportModal({ eventId, eventTitle, isOpen, onClose 
                       <span>Certificates</span>
                       <FiAward className="text-amber-300" />
                     </div>
-                    <div className="text-2xl font-bold text-amber-300">{summary.certificates_count || 0}</div>
+                    <div className="text-2xl font-bold text-amber-300">
+                      {summary.certificates_issued ?? summary.certificates_count ?? 0}
+                    </div>
                     <div className="text-[11px] text-slate-400 mt-0.5">Generated</div>
                   </div>
                 </div>
+
+                {/* Participant Feedback & Sentiment Section */}
+                {feedback && (
+                  <div
+                    className="p-5 rounded-xl border space-y-3"
+                    style={{
+                      background: "rgba(30, 41, 59, 0.4)",
+                      borderColor: "rgba(255, 255, 255, 0.08)",
+                    }}
+                  >
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <span>Event Feedback & Review Sentiment</span>
+                        <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          ★ {feedback.average_rating || 5.0} / 5.0
+                        </span>
+                      </h4>
+                      <span className="text-xs text-slate-400">
+                        {feedback.total_responses || 0} participant reviews submitted
+                      </span>
+                    </div>
+
+                    {feedback.recent_feedback && feedback.recent_feedback.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                        {feedback.recent_feedback.slice(0, 4).map((f, i) => (
+                          <div key={i} className="p-3 rounded-lg bg-slate-800/60 border border-slate-700/50 space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-semibold text-white">{f.student_name || "Student Attendee"}</span>
+                              <span className="text-amber-400 font-bold">
+                                {"★".repeat(Number(f.rating) || 5)}{"☆".repeat(5 - (Number(f.rating) || 5))}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-300 italic">"{f.comments || "Great session, well organized!"}"</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">No feedback entries recorded yet for this event.</p>
+                    )}
+                  </div>
+                )}
 
                 {/* Department Distribution (if any) */}
                 {departmentBreakdown.length > 0 && (
@@ -316,7 +372,14 @@ export default function EventReportModal({ eventId, eventTitle, isOpen, onClose 
                       {departmentBreakdown.map((dept) => (
                         <div key={dept.department} className="p-3 rounded-lg bg-slate-800/60 border border-slate-700/50">
                           <div className="text-xs text-slate-400 truncate">{dept.department}</div>
-                          <div className="text-lg font-bold text-violet-300">{dept.count} students</div>
+                          <div className="text-lg font-bold text-violet-300">
+                            {dept.registered ?? dept.count ?? 0} students
+                          </div>
+                          {dept.attended !== undefined && (
+                            <div className="text-[11px] text-slate-400 mt-0.5">
+                              {dept.attended} attended
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

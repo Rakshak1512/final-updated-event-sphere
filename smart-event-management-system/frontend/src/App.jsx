@@ -93,7 +93,7 @@ export default function App() {
         </Route>
 
         {/* Faculty routes */}
-        <Route element={<ProtectedRoute allowedRoles={["faculty", "admin"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["faculty"]} />}>
           <Route path="/faculty" element={<DashboardLayout role="faculty" />}>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<FacultyDashboard />} />
@@ -134,7 +134,7 @@ export default function App() {
         </Route>
 
         {/* Volunteer routes */}
-        <Route element={<ProtectedRoute allowedRoles={["volunteer", "faculty", "admin"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["volunteer"]} />}>
           <Route path="/volunteer" element={<DashboardLayout role="volunteer" />}>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<VolunteerDashboard />} />

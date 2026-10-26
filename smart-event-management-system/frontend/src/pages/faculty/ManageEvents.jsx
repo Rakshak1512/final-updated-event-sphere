@@ -316,11 +316,11 @@ export default function ManageEvents() {
                     </button>
                     <button
                       className="btn btn-outline btn-sm"
-                      title="View Live Event Report & PDF"
+                      title="View Event Review Report & PDF"
                       onClick={() => setReportModalTarget(ev)}
                       style={{ color: "#a855f7", borderColor: "rgba(168, 85, 247, 0.4)" }}
                     >
-                      <FiFileText size={13} /> Report
+                      <FiFileText size={13} /> Review Report
                     </button>
                     <button className="btn btn-outline btn-sm" title="View Edit History" onClick={() => openHistory(ev)}>
                       <FiClock size={13} /> History

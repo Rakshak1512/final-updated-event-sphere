@@ -108,9 +108,16 @@ export default function Login() {
       });
       setIsTestModalOpen(false);
       toast.success(`Welcome back, ${user?.name ? user.name.split(" ")[0] : "User"}!`);
-      const returnUrl = (location.state?.from?.pathname && location.state.from.pathname !== "/login")
-        ? `${location.state.from.pathname}${location.state.from.search || ""}`
-        : getDashboardDestination(user);
+      const userRole = (user?.role || "").toLowerCase();
+      const defaultDest = getDashboardDestination(user);
+      const fromPath = location.state?.from?.pathname;
+      const isAuthorizedFrom = fromPath &&
+        fromPath !== "/login" &&
+        fromPath !== "/" &&
+        (fromPath.startsWith(`/${userRole}`) || fromPath.startsWith("/events"));
+      const returnUrl = isAuthorizedFrom
+        ? `${fromPath}${location.state.from.search || ""}`
+        : defaultDest;
       navigate(returnUrl, { replace: true });
     } catch (err) {
       if (!err.response) {
@@ -151,9 +158,16 @@ export default function Login() {
       };
       const user = await login(payload);
       toast.success(`Welcome back, ${user?.name ? user.name.split(" ")[0] : "User"}!`);
-      const returnUrl = (location.state?.from?.pathname && location.state.from.pathname !== "/login")
-        ? `${location.state.from.pathname}${location.state.from.search || ""}`
-        : getDashboardDestination(user);
+      const userRole = (user?.role || "").toLowerCase();
+      const defaultDest = getDashboardDestination(user);
+      const fromPath = location.state?.from?.pathname;
+      const isAuthorizedFrom = fromPath &&
+        fromPath !== "/login" &&
+        fromPath !== "/" &&
+        (fromPath.startsWith(`/${userRole}`) || fromPath.startsWith("/events"));
+      const returnUrl = isAuthorizedFrom
+        ? `${fromPath}${location.state.from.search || ""}`
+        : defaultDest;
       navigate(returnUrl, { replace: true });
     } catch (err) {
       const msg = getAuthErrorMessage(err);

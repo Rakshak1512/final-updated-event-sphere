@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import logging
 from typing import List, Optional, Tuple
 
@@ -3791,6 +3791,7 @@ def get_event_report_data(event_id: int) -> Optional[dict]:
 
     registrations = get_event_registrations(event_id)
     certificates = get_certificates_by_event(event_id)
+    feedback_summary = get_event_feedback_summary(event_id)
 
     total_reg = len(registrations)
     confirmed_regs = [r for r in registrations if r.status in (RegistrationStatus.approved, RegistrationStatus.attended, RegistrationStatus.completed, "confirmed")]
@@ -3915,8 +3916,11 @@ def get_event_report_data(event_id: int) -> Optional[dict]:
             "attendance_rate": att_rate,
             "certificates_issued": cert_count,
             "certificates_pending": pending_certs,
+            "average_rating": feedback_summary.get("average_rating", 5.0),
+            "total_feedback_responses": feedback_summary.get("total_responses", 0),
             "generated_at": datetime.now(timezone.utc).isoformat(),
         },
+        "feedback": feedback_summary,
         "registration_timeline": registration_timeline,
         "branch_breakdown": branch_breakdown,
         "attendees": attendee_items,
@@ -3925,20 +3929,31 @@ def get_event_report_data(event_id: int) -> Optional[dict]:
     return report
 
 
-def get_admin_analytics() -> dict:
+def get_admin_analytics(time_range: Optional[str] = None, event_id: Optional[int] = None) -> dict:
     """
     Authoritative Admin analytics engine backed 100% by live Firestore records.
     Provides multi-dimensional metrics across all platform domains:
     Users, Events, Registrations, Attendance, Certificates, and Infrastructure.
+    Supports optional time_range ('7d', '30d', '90d', 'all') and event_id filtering.
     """
-    cache_key = "admin_analytics:global"
+    cache_key = f"admin_analytics:{time_range or 'all'}:{event_id or 'all'}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
     all_users = get_all_users()
     all_events = get_all_events()
+    if event_id:
+        all_events = [e for e in all_events if e.id == int(event_id)]
     all_assignments = get_all_assignments()
+
+    cutoff_date = None
+    if time_range == "7d":
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=7)).date()
+    elif time_range == "30d":
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=30)).date()
+    elif time_range == "90d":
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=90)).date()
 
     db = get_firestore_db()
 
@@ -3970,6 +3985,26 @@ def get_admin_analytics() -> dict:
 
     reg_docs = db.collection("registrations").stream()
     all_regs = [d.to_dict() for d in reg_docs]
+
+    if event_id:
+        all_regs = [r for r in all_regs if r.get("event_id") == int(event_id)]
+    if cutoff_date:
+        filtered_regs = []
+        for r in all_regs:
+            reg_at = r.get("registered_at")
+            if reg_at:
+                try:
+                    if hasattr(reg_at, "date"):
+                        r_date = reg_at.date()
+                    else:
+                        r_date = datetime.fromisoformat(str(reg_at)[:10]).date()
+                    if r_date >= cutoff_date:
+                        filtered_regs.append(r)
+                except Exception:
+                    filtered_regs.append(r)
+            else:
+                filtered_regs.append(r)
+        all_regs = filtered_regs
 
     for r in all_regs:
         status = r.get("status", "registered")
