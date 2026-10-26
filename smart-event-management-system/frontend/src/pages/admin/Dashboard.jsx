@@ -23,6 +23,7 @@ import { adminService, eventService } from "../../api/services.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useRealtime } from "../../context/RealtimeContext.jsx";
 import { formatDate } from "../../utils/format.js";
+import AdminAnalyticsDashboard from "./AdminAnalyticsDashboard.jsx";
 
 export default function AdminDashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -213,6 +214,13 @@ export default function AdminDashboard() {
           </Link>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* EXECUTIVE COMMAND CENTER: LIVE ANALYTICS OVERVIEW                        */}
+      {/* ========================================================================= */}
+      <div style={{ marginBottom: 32 }}>
+        <AdminAnalyticsDashboard embedded={true} />
+      </div>
 
       {/* Faculty Approval Statistics (Live database counters) */}
       <div style={{ marginBottom: 28 }}>

@@ -13,10 +13,12 @@ import {
   FiMaximize2,
   FiSearch,
   FiX,
+  FiClipboard,
 } from "react-icons/fi";
 import { BsQrCode } from "react-icons/bs";
 import EmptyState from "../../components/ui/EmptyState.jsx";
 import Modal from "../../components/ui/Modal.jsx";
+import { SkeletonGrid } from "../../components/ui/Loader.jsx";
 import { registrationService } from "../../api/services.js";
 import { fileUrl, formatDate, statusBadgeClass } from "../../utils/format.js";
 import QRCodeDisplay from "../../components/common/QRCodeDisplay.jsx";
@@ -302,9 +304,17 @@ export default function MyRegistrations() {
           <p style={{ fontSize: 14, color: "var(--text-secondary)", marginBottom: 20 }}>
             {errorMessage || "Unable to connect to the EventSphere server. Please verify your connection."}
           </p>
-          <button className="btn btn-primary" onClick={load}>
-            <FiRefreshCw /> Try Again
-          </button>
+          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+            <button className="btn btn-primary" onClick={load}>
+              <FiRefreshCw /> Try Again
+            </button>
+            <button className="btn btn-outline" onClick={() => window.location.reload()}>
+              Reload Page
+            </button>
+            <Link to="/student/dashboard" className="btn btn-outline">
+              Return to Home
+            </Link>
+          </div>
         </div>
       ) : regs.length === 0 ? (
         <EmptyState

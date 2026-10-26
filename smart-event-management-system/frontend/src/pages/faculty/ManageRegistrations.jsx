@@ -17,6 +17,7 @@ import {
   FiFileText,
 } from "react-icons/fi";
 import { motion } from "framer-motion";
+import Modal from "../../components/ui/Modal.jsx";
 import EmptyState from "../../components/ui/EmptyState.jsx";
 import { SkeletonGrid, SkeletonRow } from "../../components/ui/Loader.jsx";
 import PageTransition from "../../components/common/PageTransition.jsx";
@@ -66,6 +67,12 @@ export default function ManageRegistrations() {
   const [reportLoading, setReportLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("registered"); // "registered" | "attended"
   const [studentSearch, setStudentSearch] = useState("");
+  const [showCapacityModal, setShowCapacityModal] = useState(false);
+
+  const scrollToTable = () => {
+    const el = document.getElementById("manage-roster-section");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const { subscribeToEvent, addListener } = useRealtime();
 
@@ -611,52 +618,85 @@ export default function ManageRegistrations() {
                 </div>
 
                 <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                  <div
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab("registered");
+                      scrollToTable();
+                    }}
+                    title="Click to view approved registered students list"
                     style={{
-                      background: "var(--bg-glass)",
+                      background: activeTab === "registered" ? "rgba(139, 92, 246, 0.2)" : "var(--bg-glass)",
                       padding: "12px 20px",
                       borderRadius: 14,
-                      border: "1px solid var(--border-color)",
+                      border: activeTab === "registered" ? "2px solid #8b5cf6" : "1px solid var(--border-color)",
+                      boxShadow: activeTab === "registered" ? "0 0 14px rgba(139, 92, 246, 0.3)" : "none",
                       textAlign: "center",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      outline: "none",
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-2px)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
                   >
-                    <div style={{ fontSize: 11.5, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>
+                    <div style={{ fontSize: 11.5, color: activeTab === "registered" ? "#a78bfa" : "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>
                       Approved Registered
                     </div>
                     <div style={{ fontSize: 20, fontWeight: 800, color: "#8b5cf6" }}>{approvedCount}</div>
-                  </div>
+                  </button>
 
-                  <div
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab("attended");
+                      scrollToTable();
+                    }}
+                    title="Click to view attended students roster"
                     style={{
-                      background: "var(--bg-glass)",
+                      background: activeTab === "attended" ? "rgba(16, 185, 129, 0.2)" : "var(--bg-glass)",
                       padding: "12px 20px",
                       borderRadius: 14,
-                      border: "1px solid var(--border-color)",
+                      border: activeTab === "attended" ? "2px solid var(--success)" : "1px solid var(--border-color)",
+                      boxShadow: activeTab === "attended" ? "0 0 14px rgba(16, 185, 129, 0.3)" : "none",
                       textAlign: "center",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      outline: "none",
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-2px)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
                   >
-                    <div style={{ fontSize: 11.5, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>
+                    <div style={{ fontSize: 11.5, color: activeTab === "attended" ? "var(--success)" : "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>
                       Attended
                     </div>
                     <div style={{ fontSize: 20, fontWeight: 800, color: "var(--success)" }}>
                       {attendedCount}
                     </div>
-                  </div>
+                  </button>
 
-                  <div
+                  <button
+                    type="button"
+                    onClick={() => setShowCapacityModal(true)}
+                    title="Click to view event capacity and remaining seats"
                     style={{
-                      background: "var(--bg-glass)",
+                      background: showCapacityModal ? "rgba(245, 158, 11, 0.2)" : "var(--bg-glass)",
                       padding: "12px 20px",
                       borderRadius: 14,
-                      border: "1px solid var(--border-color)",
+                      border: showCapacityModal ? "2px solid var(--warning)" : "1px solid var(--border-color)",
+                      boxShadow: showCapacityModal ? "0 0 14px rgba(245, 158, 11, 0.3)" : "none",
                       textAlign: "center",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      outline: "none",
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-2px)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
                   >
-                    <div style={{ fontSize: 11.5, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>
+                    <div style={{ fontSize: 11.5, color: showCapacityModal ? "var(--warning)" : "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>
                       Remaining Spots
                     </div>
                     <div style={{ fontSize: 20, fontWeight: 800, color: "var(--warning)" }}>{remainingSeats}</div>
-                  </div>
+                  </button>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <button
@@ -681,6 +721,7 @@ export default function ManageRegistrations() {
 
           {/* Tab Switcher: Registered Students (Approved) vs Attended Students */}
           <div
+            id="manage-roster-section"
             style={{
               display: "flex",
               justifyContent: "space-between",
@@ -996,6 +1037,94 @@ export default function ManageRegistrations() {
           )}
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: EVENT CAPACITY & SPOTS BREAKDOWN                                   */}
+      {/* ========================================================================= */}
+      <Modal
+        open={showCapacityModal}
+        onClose={() => setShowCapacityModal(false)}
+        title="Event Capacity & Seat Allocation"
+        width={500}
+      >
+        <div>
+          <div style={{ marginBottom: 16 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 4px", color: "var(--text-primary)" }}>
+              {selectedEvent?.title}
+            </h3>
+            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+              📍 {selectedEvent?.venue || "Campus Venue"} · 📅 {formatDate(selectedEvent?.event_date)}
+            </span>
+          </div>
+
+          <div
+            style={{
+              background: "var(--bg-glass)",
+              padding: "16px 20px",
+              borderRadius: "16px",
+              marginBottom: 18,
+              border: "1px solid var(--border-color)",
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 14,
+              fontSize: 13,
+            }}
+          >
+            <div>
+              <span style={{ color: "var(--text-muted)", fontSize: 11.5, display: "block" }}>Max Capacity</span>
+              <strong style={{ fontSize: 18, color: "var(--text-primary)" }}>
+                {selectedEvent?.max_capacity ? `${selectedEvent.max_capacity} Seats` : "Unlimited"}
+              </strong>
+            </div>
+            <div>
+              <span style={{ color: "var(--text-muted)", fontSize: 11.5, display: "block" }}>Remaining Spots</span>
+              <strong style={{ fontSize: 18, color: "var(--warning)" }}>
+                {remainingSeats}
+              </strong>
+            </div>
+            <div>
+              <span style={{ color: "var(--text-muted)", fontSize: 11.5, display: "block" }}>Approved Registered</span>
+              <strong style={{ fontSize: 16, color: "#8b5cf6" }}>
+                {approvedCount}
+              </strong>
+            </div>
+            <div>
+              <span style={{ color: "var(--text-muted)", fontSize: 11.5, display: "block" }}>Attended Turnout</span>
+              <strong style={{ fontSize: 16, color: "var(--success)" }}>
+                {attendedCount}
+              </strong>
+            </div>
+          </div>
+
+          {selectedEvent?.max_capacity ? (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6 }}>
+                <span style={{ color: "var(--text-secondary)" }}>Occupancy Rate</span>
+                <span style={{ fontWeight: 700, color: "var(--text-primary)" }}>
+                  {Math.min(100, Math.round((approvedCount / selectedEvent.max_capacity) * 100))}%
+                </span>
+              </div>
+              <div style={{ height: 8, background: "rgba(255,255,255,0.08)", borderRadius: 99, overflow: "hidden" }}>
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${Math.min(100, Math.round((approvedCount / selectedEvent.max_capacity) * 100))}%`,
+                    background: "var(--gradient-primary)",
+                    borderRadius: 99,
+                    transition: "width 0.4s ease",
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setShowCapacityModal(false)}>
+              Close
+            </button>
+          </div>
+        </div>
+      </Modal>
     </PageTransition>
   );
 }

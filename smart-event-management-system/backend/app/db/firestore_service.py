@@ -4207,11 +4207,12 @@ def get_admin_analytics(
     cat_dist_data = [c["events_count"] for c in category_analytics] or [len(all_events)]
     cat_colors = ["#8b5cf6", "#06b6d4", "#f59e0b", "#ec4899", "#10b981", "#3b82f6", "#f97316", "#a855f7"]
 
-    # Horizontal Bar: Top Events Ranking
-    rank_events = top_events_list[:5]
+    # Horizontal Bar: Top Events Ranking by Attendance Rate
+    rank_events = sorted(top_events_list, key=lambda x: (x["attendance_rate"], x["registrations"]), reverse=True)[:5]
     rank_labels = [ev["title"][:20] + ("…" if len(ev["title"]) > 20 else "") for ev in rank_events]
     rank_data = [ev["registrations"] for ev in rank_events]
     rank_attended = [ev["attended"] for ev in rank_events]
+    rank_rates = [ev["attendance_rate"] for ev in rank_events]
 
     # Attendance Ratio: Registered vs Attended
     att_ratio_labels = ["Attended Participants", "Absent / Not Checked In"]
@@ -4245,6 +4246,8 @@ def get_admin_analytics(
             "total_registrations": total_registrations,
             "total_registered_students": len(distinct_students) if distinct_students else total_registrations,
             "confirmed_registrations": total_confirmed,
+            "approved_registrations": total_confirmed,
+            "pending_registrations": total_pending,
             "cancelled_registrations": total_cancelled,
             "total_attendance": total_attended,
             "attendance_rate": overall_att,
@@ -4286,9 +4289,10 @@ def get_admin_analytics(
                 "labels": reg_trend_labels,
                 "data": reg_trend_cumulative,
             },
-            # 6. Horizontal bar chart: top events by registrations or attendance
+            # 6. Horizontal bar chart: top events by attendance rate
             "top_events_ranking": {
                 "labels": rank_labels,
+                "attendance_rates": rank_rates,
                 "registrations": rank_data,
                 "attended": rank_attended,
             },

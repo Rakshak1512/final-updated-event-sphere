@@ -58,12 +58,12 @@ ChartJS.register(
   Filler
 );
 
-export default function AdminAnalyticsDashboard() {
+export default function AdminAnalyticsDashboard({ embedded = false }) {
   const { user, loading: authLoading } = useAuth();
   const { addListener } = useRealtime();
 
   // Route protection & session persistence
-  if (authLoading) {
+  if (!embedded && authLoading) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
         <div style={{ color: "#8b5cf6", fontSize: 16, display: "flex", alignItems: "center", gap: 10 }}>
@@ -75,7 +75,7 @@ export default function AdminAnalyticsDashboard() {
   }
 
   const userRole = (user?.role || "").toLowerCase().trim();
-  if (!user || userRole !== "admin") {
+  if (!embedded && (!user || userRole !== "admin")) {
     const target =
       userRole === "faculty"
         ? "/faculty/dashboard"
@@ -297,15 +297,22 @@ export default function AdminAnalyticsDashboard() {
   }, [charts.cumulative_registration_growth]);
 
   // 6. Horizontal Bar Chart: Top events by registrations or attendance
+  // 6. Horizontal Bar Chart: Top events by attendance rate
   const horizontalBarData = useMemo(() => {
     const raw = charts.top_events_ranking || {};
     return {
       labels: raw.labels || [],
       datasets: [
         {
+          label: "Attendance Rate (%)",
+          data: raw.attendance_rates || raw.attended?.map((a, i) => Math.round((a / Math.max(1, raw.registrations?.[i] || 1)) * 100)) || [],
+          backgroundColor: "rgba(168, 85, 247, 0.85)",
+          borderRadius: 6,
+        },
+        {
           label: "Registrations",
           data: raw.registrations || [],
-          backgroundColor: "rgba(168, 85, 247, 0.85)",
+          backgroundColor: "rgba(56, 189, 248, 0.65)",
           borderRadius: 6,
         },
         {
@@ -408,14 +415,14 @@ export default function AdminAnalyticsDashboard() {
         startY: currentY,
         head: [["Metric Category", "Metric Name", "Live Value", "Calculated Context"]],
         body: [
-          ["Events Oversight", "Total Events", String(overview.total_events ?? 0), `${overview.upcoming_events ?? 0} Upcoming • ${overview.completed_events ?? 0} Completed`],
-          ["Student Engagement", "Registered Students", String(overview.total_registered_students ?? overview.total_registrations ?? 0), "Distinct Students Registered"],
-          ["Registrations", "Total Registrations", String(overview.total_registrations ?? 0), `${overview.confirmed_registrations ?? 0} Confirmed / Approved Seats`],
-          ["Attendance Rate", "Overall Attendance", `${overview.attendance_rate ?? 0}%`, `${overview.total_attendance ?? 0} Verified Check-ins`],
-          ["Community Scale", "Students & Faculty", `${overview.total_students ?? 0} / ${overview.total_faculty ?? 0}`, "Active Institutional Accounts"],
-          ["Field Operations", "Active Volunteers", String(overview.active_volunteers ?? 0), "Approved & Operational"],
-          ["Seat Occupancy", "Total Capacity & Occupancy", `${overview.total_seat_capacity ?? 0} seats`, `${overview.overall_occupancy_rate ?? 0}% Occupancy Rate`],
-          ["Accreditation", "Certificates Issued", String(overview.total_certificates_issued ?? 0), "Verified Completion Awards"],
+          ["Events Oversight", "Total Events", String(overview.total_events ?? 0), "All Institutional Events"],
+          ["Events Oversight", "Upcoming Events", String(overview.upcoming_events ?? 0), "Scheduled Upcoming Events"],
+          ["Events Oversight", "Completed Events", String(overview.completed_events ?? 0), "Concluded Events"],
+          ["Student Engagement", "Total Registrations", String(overview.total_registrations ?? 0), `${overview.total_registered_students ?? 0} Distinct Students`],
+          ["Registrations", "Approved Registrations", String(overview.approved_registrations ?? overview.confirmed_registrations ?? 0), "Confirmed & Approved Seats"],
+          ["Registrations", "Pending Registrations", String(overview.pending_registrations ?? Math.max(0, (overview.total_registrations ?? 0) - (overview.confirmed_registrations ?? 0) - (overview.cancelled_registrations ?? 0))), "Awaiting Authorization"],
+          ["Participation", "Total Attendees", String(overview.total_attendance ?? 0), "Verified Check-ins"],
+          ["Participation", "Attendance Rate", `${overview.attendance_rate ?? 0}%`, "Attendance Turnout Efficiency"],
         ],
         theme: "striped",
         headStyles: { fillColor: [139, 92, 246], textColor: [255, 255, 255], fontStyle: "bold" },
@@ -473,10 +480,12 @@ export default function AdminAnalyticsDashboard() {
     }
   };
 
+  const Container = embedded ? "div" : PageTransition;
+
   return (
-    <PageTransition>
+    <Container>
       {/* Dashboard Top Header */}
-      <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
+      <div style={{ marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span
@@ -520,9 +529,9 @@ export default function AdminAnalyticsDashboard() {
             </span>
           </div>
 
-          <h1 style={{ fontSize: "2rem", fontWeight: 800, color: "var(--text-primary)", margin: "8px 0 4px", letterSpacing: "-0.5px" }}>
-            Admin Analytics & Intelligence
-          </h1>
+          <h2 style={{ fontSize: embedded ? "1.5rem" : "2rem", fontWeight: 800, color: "var(--text-primary)", margin: "8px 0 4px", letterSpacing: "-0.5px" }}>
+            {embedded ? "Executive Analytics & Performance Intelligence" : "Admin Analytics & Intelligence"}
+          </h2>
           <p style={{ color: "var(--text-secondary)", fontSize: "14px", margin: 0 }}>
             Live enterprise metrics, attendance tracking, and multi-dimensional institutional intelligence.
           </p>
@@ -689,12 +698,12 @@ export default function AdminAnalyticsDashboard() {
         <motion.div whileHover={{ y: -3 }} style={{ ...glassPanelStyle, borderLeft: "4px solid #8b5cf6", padding: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
-              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>Total Campus Events</span>
+              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>Total Events</span>
               <h2 style={{ fontSize: "1.9rem", fontWeight: 800, color: "#ffffff", margin: "6px 0 2px" }}>
                 {overview.total_events ?? 0}
               </h2>
               <span style={{ fontSize: 11.5, color: "#c084fc" }}>
-                {overview.upcoming_events ?? 0} upcoming · {overview.completed_events ?? 0} completed
+                All campus activities
               </span>
             </div>
             <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(139, 92, 246, 0.15)", color: "#a855f7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
@@ -703,52 +712,34 @@ export default function AdminAnalyticsDashboard() {
           </div>
         </motion.div>
 
-        {/* KPI 2: Total Registered Students */}
+        {/* KPI 2: Upcoming Events */}
         <motion.div whileHover={{ y: -3 }} style={{ ...glassPanelStyle, borderLeft: "4px solid #06b6d4", padding: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
-              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>Registered Students</span>
+              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>Upcoming Events</span>
               <h2 style={{ fontSize: "1.9rem", fontWeight: 800, color: "#ffffff", margin: "6px 0 2px" }}>
-                {overview.total_registered_students ?? overview.total_registrations ?? 0}
+                {overview.upcoming_events ?? 0}
               </h2>
               <span style={{ fontSize: 11.5, color: "#38bdf8" }}>
-                Distinct active participants
+                Scheduled future dates
               </span>
             </div>
             <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(6, 182, 212, 0.15)", color: "#06b6d4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
-              <FiUsers />
+              <FiClock />
             </div>
           </div>
         </motion.div>
 
-        {/* KPI 3: Confirmed Registrations */}
-        <motion.div whileHover={{ y: -3 }} style={{ ...glassPanelStyle, borderLeft: "4px solid #ec4899", padding: 20 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
-              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>Confirmed Registrations</span>
-              <h2 style={{ fontSize: "1.9rem", fontWeight: 800, color: "#ffffff", margin: "6px 0 2px" }}>
-                {overview.confirmed_registrations ?? 0}
-              </h2>
-              <span style={{ fontSize: 11.5, color: "#f472b6" }}>
-                {overview.total_registrations ?? 0} total registered seats
-              </span>
-            </div>
-            <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(236, 72, 153, 0.15)", color: "#ec4899", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
-              <FiCheckSquare />
-            </div>
-          </div>
-        </motion.div>
-
-        {/* KPI 4: Attendees & Attendance Rate */}
+        {/* KPI 3: Completed Events */}
         <motion.div whileHover={{ y: -3 }} style={{ ...glassPanelStyle, borderLeft: "4px solid #10b981", padding: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
-              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>Attendance Rate</span>
+              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>Completed Events</span>
               <h2 style={{ fontSize: "1.9rem", fontWeight: 800, color: "#ffffff", margin: "6px 0 2px" }}>
-                {overview.attendance_rate ?? 0}%
+                {overview.completed_events ?? 0}
               </h2>
               <span style={{ fontSize: 11.5, color: "#34d399" }}>
-                {overview.total_attendance ?? 0} verified attendee check-ins
+                Successfully concluded
               </span>
             </div>
             <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(16, 185, 129, 0.15)", color: "#10b981", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
@@ -757,16 +748,16 @@ export default function AdminAnalyticsDashboard() {
           </div>
         </motion.div>
 
-        {/* KPI 5: Students & Faculty */}
+        {/* KPI 4: Total Registrations */}
         <motion.div whileHover={{ y: -3 }} style={{ ...glassPanelStyle, borderLeft: "4px solid #3b82f6", padding: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
-              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>Students & Faculty</span>
+              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>Total Registrations</span>
               <h2 style={{ fontSize: "1.9rem", fontWeight: 800, color: "#ffffff", margin: "6px 0 2px" }}>
-                {(overview.total_students ?? 0) + (overview.total_faculty ?? 0)}
+                {overview.total_registrations ?? 0}
               </h2>
               <span style={{ fontSize: 11.5, color: "#60a5fa" }}>
-                {overview.total_students ?? 0} students · {overview.total_faculty ?? 0} faculty
+                {overview.total_registered_students ?? 0} distinct students
               </span>
             </div>
             <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(59, 130, 246, 0.15)", color: "#3b82f6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
@@ -775,56 +766,74 @@ export default function AdminAnalyticsDashboard() {
           </div>
         </motion.div>
 
-        {/* KPI 6: Active Volunteers */}
+        {/* KPI 5: Approved Registrations */}
+        <motion.div whileHover={{ y: -3 }} style={{ ...glassPanelStyle, borderLeft: "4px solid #8b5cf6", padding: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>Approved Registrations</span>
+              <h2 style={{ fontSize: "1.9rem", fontWeight: 800, color: "#ffffff", margin: "6px 0 2px" }}>
+                {overview.approved_registrations ?? overview.confirmed_registrations ?? 0}
+              </h2>
+              <span style={{ fontSize: 11.5, color: "#c084fc" }}>
+                Confirmed & authorized seats
+              </span>
+            </div>
+            <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(139, 92, 246, 0.15)", color: "#8b5cf6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
+              <FiCheckSquare />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* KPI 6: Pending Registrations */}
         <motion.div whileHover={{ y: -3 }} style={{ ...glassPanelStyle, borderLeft: "4px solid #f59e0b", padding: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
-              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>Active Volunteers</span>
+              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>Pending Registrations</span>
               <h2 style={{ fontSize: "1.9rem", fontWeight: 800, color: "#ffffff", margin: "6px 0 2px" }}>
-                {overview.active_volunteers ?? overview.total_volunteers ?? 0}
+                {overview.pending_registrations ?? Math.max(0, (overview.total_registrations ?? 0) - (overview.confirmed_registrations ?? 0) - (overview.cancelled_registrations ?? 0))}
               </h2>
               <span style={{ fontSize: 11.5, color: "#fbbf24" }}>
-                Field operations & check-in verification
+                Awaiting faculty approval
               </span>
             </div>
             <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(245, 158, 11, 0.15)", color: "#f59e0b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
-              <FiTarget />
+              <FiClock />
             </div>
           </div>
         </motion.div>
 
-        {/* KPI 7: Capacity & Occupancy */}
-        <motion.div whileHover={{ y: -3 }} style={{ ...glassPanelStyle, borderLeft: "4px solid #a855f7", padding: 20 }}>
+        {/* KPI 7: Total Attendees */}
+        <motion.div whileHover={{ y: -3 }} style={{ ...glassPanelStyle, borderLeft: "4px solid #10b981", padding: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
-              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>Seat Occupancy</span>
+              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>Total Attendees</span>
               <h2 style={{ fontSize: "1.9rem", fontWeight: 800, color: "#ffffff", margin: "6px 0 2px" }}>
-                {overview.overall_occupancy_rate ?? 0}%
+                {overview.total_attendance ?? 0}
               </h2>
-              <span style={{ fontSize: 11.5, color: "#d8b4fe" }}>
-                {overview.total_seat_capacity ?? 0} total campus spots
+              <span style={{ fontSize: 11.5, color: "#34d399" }}>
+                Verified check-in turnout
               </span>
             </div>
-            <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(168, 85, 247, 0.15)", color: "#a855f7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
-              <FiPercent />
-            </div>
-          </div>
-        </motion.div>
-
-        {/* KPI 8: Certificates Issued */}
-        <motion.div whileHover={{ y: -3 }} style={{ ...glassPanelStyle, borderLeft: "4px solid #14b8a6", padding: 20 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
-              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>Certificates Issued</span>
-              <h2 style={{ fontSize: "1.9rem", fontWeight: 800, color: "#ffffff", margin: "6px 0 2px" }}>
-                {overview.total_certificates_issued ?? 0}
-              </h2>
-              <span style={{ fontSize: 11.5, color: "#2dd4bf" }}>
-                Official participant recognitions
-              </span>
-            </div>
-            <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(20, 184, 166, 0.15)", color: "#14b8a6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
+            <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(16, 185, 129, 0.15)", color: "#10b981", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
               <FiAward />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* KPI 8: Attendance Rate */}
+        <motion.div whileHover={{ y: -3 }} style={{ ...glassPanelStyle, borderLeft: "4px solid #ec4899", padding: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>Attendance Rate</span>
+              <h2 style={{ fontSize: "1.9rem", fontWeight: 800, color: "#ffffff", margin: "6px 0 2px" }}>
+                {overview.attendance_rate ?? 0}%
+              </h2>
+              <span style={{ fontSize: 11.5, color: "#f472b6" }}>
+                Ratio of attended to registered
+              </span>
+            </div>
+            <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(236, 72, 153, 0.15)", color: "#ec4899", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
+              <FiPercent />
             </div>
           </div>
         </motion.div>
@@ -1218,6 +1227,6 @@ export default function AdminAnalyticsDashboard() {
           onClose={() => setSelectedEventReport(null)}
         />
       )}
-    </PageTransition>
+    </Container>
   );
 }

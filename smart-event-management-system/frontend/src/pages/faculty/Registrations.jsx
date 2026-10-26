@@ -82,7 +82,18 @@ export default function FacultyRegistrations() {
   const [approveTarget, setApproveTarget] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [detailsTarget, setDetailsTarget] = useState(null);
+  const [showCapacityModal, setShowCapacityModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const scrollToRoster = () => {
+    const el = document.getElementById("registrations-roster-section");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const scrollToBranches = () => {
+    const el = document.getElementById("branch-wise-section");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const { subscribeToEvent, addListener } = useRealtime();
 
@@ -798,15 +809,33 @@ export default function FacultyRegistrations() {
                 {/* Prominent High-Level Registration Statistics */}
                 <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                   {/* PROMINENT TOTAL REGISTRATIONS */}
-                  <div
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveFilter("all");
+                      setSelectedBranch("all");
+                      scrollToRoster();
+                    }}
+                    title="Click to view all registrations"
                     style={{
-                      background: "linear-gradient(135deg, rgba(139, 92, 246, 0.22) 0%, rgba(99, 102, 241, 0.15) 100%)",
+                      background: activeFilter === "all" && selectedBranch === "all"
+                        ? "linear-gradient(135deg, rgba(139, 92, 246, 0.35) 0%, rgba(99, 102, 241, 0.25) 100%)"
+                        : "linear-gradient(135deg, rgba(139, 92, 246, 0.22) 0%, rgba(99, 102, 241, 0.15) 100%)",
                       padding: "12px 20px",
                       borderRadius: 16,
-                      border: "1.5px solid rgba(139, 92, 246, 0.4)",
+                      border: activeFilter === "all" && selectedBranch === "all"
+                        ? "2px solid #a78bfa"
+                        : "1.5px solid rgba(139, 92, 246, 0.4)",
                       textAlign: "center",
-                      boxShadow: "0 4px 16px rgba(139, 92, 246, 0.15)",
+                      boxShadow: activeFilter === "all" && selectedBranch === "all"
+                        ? "0 0 18px rgba(139, 92, 246, 0.35)"
+                        : "0 4px 16px rgba(139, 92, 246, 0.15)",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      outline: "none",
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-2px)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
                   >
                     <div style={{ fontSize: 11, color: "#c4b5fd", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.5px" }}>
                       TOTAL REGISTRATIONS
@@ -814,86 +843,147 @@ export default function FacultyRegistrations() {
                     <div style={{ fontSize: 24, fontWeight: 900, color: "#fff", marginTop: 2 }}>
                       {totalRegistrationsCount}
                     </div>
-                  </div>
+                  </button>
 
-                  <div
+                  {/* 1. BRANCHES */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      scrollToBranches();
+                    }}
+                    title="Click to view branch participation breakdown"
                     style={{
-                      background: "var(--bg-glass)",
+                      background: selectedBranch !== "all" ? "rgba(6, 182, 212, 0.18)" : "var(--bg-glass)",
                       padding: "10px 16px",
                       borderRadius: 14,
-                      border: "1px solid var(--border-color)",
+                      border: selectedBranch !== "all" ? "2px solid #06b6d4" : "1px solid var(--border-color)",
+                      boxShadow: selectedBranch !== "all" ? "0 0 14px rgba(6, 182, 212, 0.3)" : "none",
                       textAlign: "center",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      outline: "none",
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-2px)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
                   >
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>
+                    <div style={{ fontSize: 11, color: selectedBranch !== "all" ? "#06b6d4" : "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>
                       Branches
                     </div>
                     <div style={{ fontSize: 18, fontWeight: 800, color: "#06b6d4" }}>
                       {dynamicBranches.length}
                     </div>
-                  </div>
+                  </button>
 
-                  <div
+                  {/* 2. APPROVED */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveFilter((prev) => (prev === "approved" ? "all" : "approved"));
+                      scrollToRoster();
+                    }}
+                    title={activeFilter === "approved" ? "Active: Click to show all registrations" : "Click to filter approved registrations"}
                     style={{
-                      background: "var(--bg-glass)",
+                      background: activeFilter === "approved" ? "rgba(16, 185, 129, 0.18)" : "var(--bg-glass)",
                       padding: "10px 16px",
                       borderRadius: 14,
-                      border: "1px solid var(--border-color)",
+                      border: activeFilter === "approved" ? "2px solid var(--success)" : "1px solid var(--border-color)",
+                      boxShadow: activeFilter === "approved" ? "0 0 14px rgba(16, 185, 129, 0.3)" : "none",
                       textAlign: "center",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      outline: "none",
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-2px)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
                   >
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>
+                    <div style={{ fontSize: 11, color: activeFilter === "approved" ? "var(--success)" : "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>
                       Approved
                     </div>
                     <div style={{ fontSize: 18, fontWeight: 800, color: "var(--success)" }}>{approvedCount}</div>
-                  </div>
+                  </button>
 
-                  <div
+                  {/* 3. PENDING */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveFilter((prev) => (prev === "pending" ? "all" : "pending"));
+                      scrollToRoster();
+                    }}
+                    title={activeFilter === "pending" ? "Active: Click to show all registrations" : "Click to filter pending registrations"}
                     style={{
-                      background: "var(--bg-glass)",
+                      background: activeFilter === "pending" ? "rgba(245, 158, 11, 0.18)" : "var(--bg-glass)",
                       padding: "10px 16px",
                       borderRadius: 14,
-                      border: "1px solid var(--border-color)",
+                      border: activeFilter === "pending" ? "2px solid #f59e0b" : "1px solid var(--border-color)",
+                      boxShadow: activeFilter === "pending" ? "0 0 14px rgba(245, 158, 11, 0.3)" : "none",
                       textAlign: "center",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      outline: "none",
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-2px)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
                   >
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>
+                    <div style={{ fontSize: 11, color: activeFilter === "pending" ? "#f59e0b" : "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>
                       Pending
                     </div>
                     <div style={{ fontSize: 18, fontWeight: 800, color: "#f59e0b" }}>{pendingCount}</div>
-                  </div>
+                  </button>
 
-                  <div
+                  {/* 4. CANCELLED */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveFilter((prev) => (prev === "cancelled" ? "all" : "cancelled"));
+                      scrollToRoster();
+                    }}
+                    title={activeFilter === "cancelled" ? "Active: Click to show all registrations" : "Click to filter cancelled registrations"}
                     style={{
-                      background: "var(--bg-glass)",
+                      background: activeFilter === "cancelled" ? "rgba(239, 68, 68, 0.18)" : "var(--bg-glass)",
                       padding: "10px 16px",
                       borderRadius: 14,
-                      border: "1px solid var(--border-color)",
+                      border: activeFilter === "cancelled" ? "2px solid var(--danger)" : "1px solid var(--border-color)",
+                      boxShadow: activeFilter === "cancelled" ? "0 0 14px rgba(239, 68, 68, 0.3)" : "none",
                       textAlign: "center",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      outline: "none",
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-2px)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
                   >
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>
+                    <div style={{ fontSize: 11, color: activeFilter === "cancelled" ? "var(--danger)" : "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>
                       Cancelled
                     </div>
                     <div style={{ fontSize: 18, fontWeight: 800, color: "var(--danger)" }}>{cancelledCount}</div>
-                  </div>
+                  </button>
 
-                  <div
+                  {/* 5. REMAINING SPOTS */}
+                  <button
+                    type="button"
+                    onClick={() => setShowCapacityModal(true)}
+                    title="Click to inspect event capacity and remaining seats"
                     style={{
-                      background: "var(--bg-glass)",
+                      background: showCapacityModal ? "rgba(6, 182, 212, 0.18)" : "var(--bg-glass)",
                       padding: "10px 16px",
                       borderRadius: 14,
-                      border: "1px solid var(--border-color)",
+                      border: showCapacityModal ? "2px solid var(--info)" : "1px solid var(--border-color)",
+                      boxShadow: showCapacityModal ? "0 0 14px rgba(6, 182, 212, 0.3)" : "none",
                       textAlign: "center",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      outline: "none",
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-2px)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
                   >
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>
+                    <div style={{ fontSize: 11, color: showCapacityModal ? "var(--info)" : "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>
                       Remaining Spots
                     </div>
                     <div style={{ fontSize: 18, fontWeight: 800, color: "var(--info)" }}>
                       {capacity?.remainingSeats !== undefined ? capacity.remainingSeats : selectedEvent?.available_seats ?? "—"}
                     </div>
-                  </div>
+                  </button>
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
                     <button
@@ -980,7 +1070,7 @@ export default function FacultyRegistrations() {
           {/* ========================================================================= */}
           {/* BRANCH-WISE REGISTRATIONS & DYNAMIC ANALYTICS SECTION                     */}
           {/* ========================================================================= */}
-          <div style={{ marginBottom: 24 }}>
+          <div id="branch-wise-section" style={{ marginBottom: 24 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <FiLayers size={18} color="#8b5cf6" />
@@ -1186,6 +1276,7 @@ export default function FacultyRegistrations() {
 
           {/* Filter Tabs & Multi-Field Search Bar */}
           <div
+            id="registrations-roster-section"
             style={{
               display: "flex",
               justifyContent: "space-between",
@@ -1830,6 +1921,93 @@ export default function FacultyRegistrations() {
             </div>
           </div>
         )}
+      </Modal>
+      {/* ========================================================================= */}
+      {/* MODAL: EVENT CAPACITY & SPOTS BREAKDOWN                                   */}
+      {/* ========================================================================= */}
+      <Modal
+        open={showCapacityModal}
+        onClose={() => setShowCapacityModal(false)}
+        title="Event Capacity & Seat Allocation"
+        width={500}
+      >
+        <div>
+          <div style={{ marginBottom: 16 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 4px", color: "var(--text-primary)" }}>
+              {selectedEvent?.title}
+            </h3>
+            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+              📍 {selectedEvent?.venue || "Campus Venue"} · 📅 {formatDate(selectedEvent?.event_date)}
+            </span>
+          </div>
+
+          <div
+            style={{
+              background: "var(--bg-glass)",
+              padding: "16px 20px",
+              borderRadius: "16px",
+              marginBottom: 18,
+              border: "1px solid var(--border-color)",
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 14,
+              fontSize: 13,
+            }}
+          >
+            <div>
+              <span style={{ color: "var(--text-muted)", fontSize: 11.5, display: "block" }}>Max Capacity</span>
+              <strong style={{ fontSize: 18, color: "var(--text-primary)" }}>
+                {selectedEvent?.max_capacity ? `${selectedEvent.max_capacity} Seats` : "Unlimited"}
+              </strong>
+            </div>
+            <div>
+              <span style={{ color: "var(--text-muted)", fontSize: 11.5, display: "block" }}>Remaining Spots</span>
+              <strong style={{ fontSize: 18, color: "var(--info)" }}>
+                {capacity?.remainingSeats !== undefined ? capacity.remainingSeats : selectedEvent?.available_seats ?? "Unlimited"}
+              </strong>
+            </div>
+            <div>
+              <span style={{ color: "var(--text-muted)", fontSize: 11.5, display: "block" }}>Approved / Confirmed</span>
+              <strong style={{ fontSize: 16, color: "var(--success)" }}>
+                {approvedCount}
+              </strong>
+            </div>
+            <div>
+              <span style={{ color: "var(--text-muted)", fontSize: 11.5, display: "block" }}>Pending Approval</span>
+              <strong style={{ fontSize: 16, color: "#f59e0b" }}>
+                {pendingCount}
+              </strong>
+            </div>
+          </div>
+
+          {selectedEvent?.max_capacity ? (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6 }}>
+                <span style={{ color: "var(--text-secondary)" }}>Occupancy Rate</span>
+                <span style={{ fontWeight: 700, color: "var(--text-primary)" }}>
+                  {Math.min(100, Math.round((approvedCount / selectedEvent.max_capacity) * 100))}%
+                </span>
+              </div>
+              <div style={{ height: 8, background: "rgba(255,255,255,0.08)", borderRadius: 99, overflow: "hidden" }}>
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${Math.min(100, Math.round((approvedCount / selectedEvent.max_capacity) * 100))}%`,
+                    background: "var(--gradient-primary)",
+                    borderRadius: 99,
+                    transition: "width 0.4s ease",
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setShowCapacityModal(false)}>
+              Close
+            </button>
+          </div>
+        </div>
       </Modal>
     </PageTransition>
   );
