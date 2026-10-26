@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   FiUsers,
@@ -26,6 +26,18 @@ import { formatDate } from "../../utils/format.js";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
+
+  const userRole = (user?.role || "").toLowerCase().trim();
+  if (userRole && userRole !== "admin") {
+    const target =
+      userRole === "faculty"
+        ? "/faculty/dashboard"
+        : userRole === "volunteer"
+        ? "/volunteer/dashboard"
+        : "/student/dashboard";
+    return <Navigate to={target} replace />;
+  }
+
   const { addListener } = useRealtime();
   const [summary, setSummary] = useState(null);
   const [facultyList, setFacultyList] = useState([]);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { FiCalendar, FiClipboard, FiAward, FiClock, FiArrowRight, FiCheckCircle } from "react-icons/fi";
 import StatCard from "../../components/dashboard/StatCard.jsx";
@@ -14,6 +14,18 @@ import { formatDate, statusBadgeClass } from "../../utils/format.js";
 
 export default function StudentDashboard() {
   const { user } = useAuth();
+
+  const userRole = (user?.role || "").toLowerCase().trim();
+  if (userRole && userRole !== "student") {
+    const target =
+      userRole === "admin"
+        ? "/admin/dashboard"
+        : userRole === "faculty"
+        ? "/faculty/dashboard"
+        : "/volunteer/dashboard";
+    return <Navigate to={target} replace />;
+  }
+
   const { addListener } = useRealtime();
   const [analytics, setAnalytics] = useState(null);
   const [upcoming, setUpcoming] = useState([]);

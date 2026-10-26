@@ -26,7 +26,7 @@ router = APIRouter(prefix="/api/volunteer", tags=["Volunteer"])
 
 @router.get("/dashboard", response_model=VolunteerDashboardStats)
 def get_volunteer_dashboard(
-    current_user: User = Depends(require_role(RoleEnum.volunteer, RoleEnum.faculty, RoleEnum.admin)),
+    current_user: User = Depends(require_role(RoleEnum.volunteer)),
 ):
     """
     Get stats, assigned events, and recent scans for the volunteer dashboard.

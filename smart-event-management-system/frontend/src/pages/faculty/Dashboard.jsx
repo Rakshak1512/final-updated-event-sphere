@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   FiCalendar,
@@ -28,6 +28,18 @@ import { formatDate } from "../../utils/format.js";
 
 export default function FacultyDashboard() {
   const { user } = useAuth();
+
+  const userRole = (user?.role || "").toLowerCase().trim();
+  if (userRole && userRole !== "faculty") {
+    const target =
+      userRole === "admin"
+        ? "/admin/dashboard"
+        : userRole === "volunteer"
+        ? "/volunteer/dashboard"
+        : "/student/dashboard";
+    return <Navigate to={target} replace />;
+  }
+
   const { addListener } = useRealtime();
   const [analytics, setAnalytics] = useState(null);
   const [recentEvents, setRecentEvents] = useState([]);

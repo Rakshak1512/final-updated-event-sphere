@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Navigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
@@ -187,6 +188,18 @@ function preprocessImageForQR(file) {
 
 export default function VolunteerDashboard() {
   const { user } = useAuth();
+
+  const userRole = (user?.role || "").toLowerCase().trim();
+  if (userRole && userRole !== "volunteer") {
+    const target =
+      userRole === "admin"
+        ? "/admin/dashboard"
+        : userRole === "faculty"
+        ? "/faculty/dashboard"
+        : "/student/dashboard";
+    return <Navigate to={target} replace />;
+  }
+
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     volunteer_name: user?.name || "Volunteer",
