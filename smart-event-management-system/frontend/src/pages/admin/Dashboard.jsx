@@ -25,7 +25,9 @@ import { useRealtime } from "../../context/RealtimeContext.jsx";
 import { formatDate } from "../../utils/format.js";
 
 export default function AdminDashboard() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+
+  if (authLoading) return null;
 
   const userRole = (user?.role || "").toLowerCase().trim();
   if (!user || userRole !== "admin") {

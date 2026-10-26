@@ -35,8 +35,19 @@ def faculty_analytics(
 def admin_analytics(
     time_range: Optional[str] = None,
     event_id: Optional[int] = None,
+    category: Optional[str] = None,
+    registration_status: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     current_user: User = Depends(require_role(RoleEnum.admin)),
 ):
-    data = db_service.get_admin_analytics(time_range=time_range, event_id=event_id)
+    data = db_service.get_admin_analytics(
+        time_range=time_range,
+        event_id=event_id,
+        category=category,
+        registration_status=registration_status,
+        date_from=date_from,
+        date_to=date_to,
+    )
     return data
 

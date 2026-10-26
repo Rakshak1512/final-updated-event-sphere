@@ -187,7 +187,9 @@ function preprocessImageForQR(file) {
 }
 
 export default function VolunteerDashboard() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+
+  if (authLoading) return null;
 
   const userRole = (user?.role || "").toLowerCase().trim();
   if (!user || userRole !== "volunteer") {

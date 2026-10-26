@@ -318,15 +318,17 @@ export default function ManageEvents() {
                     <button className="btn btn-outline btn-sm" style={{ flex: 1 }} onClick={() => openEdit(ev)}>
                       <FiEdit2 size={13} /> Edit
                     </button>
-                    <Link
-                      to={`${isAdmin ? "/admin/events" : "/faculty/events"}/${ev.id}/report`}
-                      state={{ from: isAdmin ? "/admin/events" : "/faculty/events" }}
-                      className="btn btn-outline btn-sm"
-                      title="View Dedicated Event Review Report & Download PDF"
-                      style={{ color: "#a855f7", borderColor: "rgba(168, 85, 247, 0.4)", display: "inline-flex", alignItems: "center", gap: 6 }}
-                    >
-                      <FiFileText size={13} /> Review Report
-                    </Link>
+                    {isAdmin && (
+                      <Link
+                        to={`/admin/events/${ev.id}/report`}
+                        state={{ from: "/admin/events" }}
+                        className="btn btn-outline btn-sm"
+                        title="View Dedicated Event Review Report & Download PDF"
+                        style={{ color: "#a855f7", borderColor: "rgba(168, 85, 247, 0.4)", display: "inline-flex", alignItems: "center", gap: 6 }}
+                      >
+                        <FiFileText size={13} /> Review Report
+                      </Link>
+                    )}
                     <button className="btn btn-outline btn-sm" title="View Edit History" onClick={() => openHistory(ev)}>
                       <FiClock size={13} /> History
                     </button>

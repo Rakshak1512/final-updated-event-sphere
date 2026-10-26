@@ -9,7 +9,6 @@ import {
   FiUsers,
   FiRefreshCw,
   FiAlertCircle,
-  FiStar,
   FiCheck,
   FiMaximize2,
   FiSearch,
@@ -18,8 +17,7 @@ import {
 import { BsQrCode } from "react-icons/bs";
 import EmptyState from "../../components/ui/EmptyState.jsx";
 import Modal from "../../components/ui/Modal.jsx";
-import { SkeletonGrid } from "../../components/ui/Loader.jsx";
-import { registrationService, feedbackService } from "../../api/services.js";
+import { registrationService } from "../../api/services.js";
 import { fileUrl, formatDate, statusBadgeClass } from "../../utils/format.js";
 import QRCodeDisplay from "../../components/common/QRCodeDisplay.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -36,7 +34,6 @@ export default function MyRegistrations() {
   const [qrModal, setQrModal] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelling, setCancelling] = useState(false);
-  const [feedbackModal, setFeedbackModal] = useState(null);
   const { addListener } = useRealtime();
 
   const load = () => {
@@ -99,24 +96,6 @@ export default function MyRegistrations() {
       );
     } finally {
       setCancelling(false);
-    }
-  };
-
-  const handleFeedbackSubmit = async (e) => {
-    e.preventDefault();
-    if (!feedbackModal) return;
-    setFeedbackModal((prev) => ({ ...prev, submitting: true }));
-    try {
-      await feedbackService.submit({
-        event_id: feedbackModal.eventId,
-        rating: feedbackModal.rating,
-        comment: feedbackModal.comment,
-      });
-      toast.success("Thank you! Your feedback has been submitted.");
-      setFeedbackModal(null);
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Could not submit feedback");
-      setFeedbackModal((prev) => ({ ...prev, submitting: false }));
     }
   };
 
@@ -495,26 +474,6 @@ export default function MyRegistrations() {
                     <FiDownload size={14} /> Slip
                   </button>
 
-                  {/* Feedback Button */}
-                  {!isCancelled && (
-                    <button
-                      className="btn btn-outline btn-sm"
-                      onClick={() =>
-                        setFeedbackModal({
-                          eventId: r.event_id,
-                          eventTitle: ev.title || "Campus Event",
-                          rating: 5,
-                          comment: "",
-                          submitting: false,
-                        })
-                      }
-                      title="Rate & Review Event"
-                      style={{ color: "#f59e0b", borderColor: "rgba(245, 158, 11, 0.4)" }}
-                    >
-                      <FiStar size={14} /> Rate
-                    </button>
-                  )}
-
                   {!isCancelled && !isAttended && (
                     <button
                       className="btn btn-sm"
@@ -658,76 +617,6 @@ export default function MyRegistrations() {
             {cancelling ? "Cancelling..." : "Yes, Cancel"}
           </button>
         </div>
-      </Modal>
-
-      {/* RATING & FEEDBACK MODAL */}
-      <Modal
-        open={!!feedbackModal}
-        onClose={() => setFeedbackModal(null)}
-        title="Rate & Review Event"
-        width={460}
-      >
-        {feedbackModal && (
-          <form onSubmit={handleFeedbackSubmit}>
-            <p style={{ fontSize: 14, color: "var(--text-secondary)", marginBottom: 16 }}>
-              Share your experience for <strong>{feedbackModal.eventTitle}</strong>
-            </p>
-
-            <div className="form-group">
-              <label className="form-label">Your Rating (1 to 5 Stars)</label>
-              <div style={{ display: "flex", gap: 8, margin: "8px 0 14px" }}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    type="button"
-                    key={star}
-                    onClick={() => setFeedbackModal((prev) => ({ ...prev, rating: star }))}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: 24,
-                      color: star <= feedbackModal.rating ? "#f59e0b" : "var(--text-muted)",
-                      padding: 0,
-                    }}
-                  >
-                    ★
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Review / Comments (Optional)</label>
-              <textarea
-                className="form-input"
-                rows={3}
-                value={feedbackModal.comment}
-                onChange={(e) =>
-                  setFeedbackModal((prev) => ({ ...prev, comment: e.target.value }))
-                }
-                placeholder="What did you like about this event? Any suggestions for next time?"
-              />
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => setFeedbackModal(null)}
-                disabled={feedbackModal.submitting}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={feedbackModal.submitting}
-              >
-                {feedbackModal.submitting ? "Submitting..." : "Submit Review"}
-              </button>
-            </div>
-          </form>
-        )}
       </Modal>
     </div>
   );

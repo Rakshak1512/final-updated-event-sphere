@@ -27,10 +27,27 @@ import {
   generateRegistrationReportPDF,
   generateAttendanceReportPDF,
 } from "../../utils/pdfReportGenerator.js";
+import { useAuth } from "../../context/AuthContext.jsx";
 
 export default function ManageRegistrations() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
+  const { user } = useAuth();
+  const isAdmin = (user?.role || "").toLowerCase() === "admin";
+
+  const isEventManageable = useCallback(
+    (ev) => {
+      if (isAdmin) return true;
+      if (!ev || !user) return false;
+      if (ev.created_by && Number(ev.created_by) === Number(user.id)) return true;
+      if (ev.organizer_email && user.email && ev.organizer_email.toLowerCase() === user.email.toLowerCase()) return true;
+      if (ev.organizer_name && user.name && ev.organizer_name.toLowerCase() === user.name.toLowerCase()) return true;
+      if (ev.organizer_department && user.department && ev.organizer_department.toLowerCase() === user.department.toLowerCase()) return true;
+      if (!ev.created_by && !ev.organizer_email) return true;
+      return false;
+    },
+    [isAdmin, user]
+  );
 
   const [events, setEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
@@ -64,8 +81,9 @@ export default function ManageRegistrations() {
         sort_order: "desc",
       });
       const items = data.items || [];
-      setEvents(items);
-      if (showToast) toast.success(`Loaded ${items.length} events`);
+      const manageable = isAdmin ? items : items.filter(isEventManageable);
+      setEvents(manageable);
+      if (showToast) toast.success(`Loaded ${manageable.length} events`);
     } catch (err) {
       console.error("Events catalog load error:", err);
       const detail = err.response?.data?.detail || "Unable to load events. Please retry.";
@@ -74,7 +92,7 @@ export default function ManageRegistrations() {
     } finally {
       setEventsLoading(false);
     }
-  }, []);
+  }, [isAdmin, isEventManageable]);
 
   useEffect(() => {
     loadEventsCatalog(false);
@@ -87,7 +105,10 @@ export default function ManageRegistrations() {
       if (!document.hidden) {
         eventService
           .list({ page: 1, page_size: 100, sort_by: "created_at", sort_order: "desc" })
-          .then(({ data }) => setEvents(data.items || []))
+          .then(({ data }) => {
+            const items = data.items || [];
+            setEvents(isAdmin ? items : items.filter(isEventManageable));
+          })
           .catch(() => {});
       }
     }, 4000);

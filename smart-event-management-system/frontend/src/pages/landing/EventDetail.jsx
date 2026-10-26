@@ -395,21 +395,23 @@ export default function EventDetail({ embedded = false }) {
               </div>
             ) : user && (["faculty", "admin"].includes((user.role || "").toLowerCase())) ? (
               <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
-                <Link
-                  to={`${(user.role || "").toLowerCase() === "admin" ? "/admin/events" : "/faculty/events"}/${event.id}/report`}
-                  state={{ from: location.pathname }}
-                  className="btn btn-primary"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    background: "linear-gradient(135deg, #8b5cf6, #ec4899)",
-                    border: "none",
-                    boxShadow: "0 4px 14px rgba(139, 92, 246, 0.35)",
-                  }}
-                >
-                  <FiFileText size={16} /> Review Report
-                </Link>
+                {(user.role || "").toLowerCase() === "admin" && (
+                  <Link
+                    to={`/admin/events/${event.id}/report`}
+                    state={{ from: location.pathname }}
+                    className="btn btn-primary"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      background: "linear-gradient(135deg, #8b5cf6, #ec4899)",
+                      border: "none",
+                      boxShadow: "0 4px 14px rgba(139, 92, 246, 0.35)",
+                    }}
+                  >
+                    <FiFileText size={16} /> Review Report
+                  </Link>
+                )}
                 <Link
                   to={`${(user.role || "").toLowerCase() === "admin" ? "/admin/registrations" : "/faculty/registrations"}?eventId=${event.id}`}
                   state={{ eventId: event.id, from: location.pathname }}

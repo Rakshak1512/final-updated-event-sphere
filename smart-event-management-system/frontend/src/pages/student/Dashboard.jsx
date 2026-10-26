@@ -13,7 +13,9 @@ import { useRealtime } from "../../context/RealtimeContext.jsx";
 import { formatDate, statusBadgeClass } from "../../utils/format.js";
 
 export default function StudentDashboard() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+
+  if (authLoading) return null;
 
   const userRole = (user?.role || "").toLowerCase().trim();
   if (!user || userRole !== "student") {

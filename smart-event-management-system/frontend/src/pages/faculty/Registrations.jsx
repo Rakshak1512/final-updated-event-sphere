@@ -32,16 +32,35 @@ import { useRealtime } from "../../context/RealtimeContext.jsx";
 import { formatDate } from "../../utils/format.js";
 import { exportToCSV, slugifyFilename } from "../../utils/exportUtils.js";
 import { generateCustomReportPDF } from "../../utils/pdfReportGenerator.js";
+import { useAuth } from "../../context/AuthContext.jsx";
+import Pagination from "../../components/ui/Pagination.jsx";
 
 export default function FacultyRegistrations() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = (user?.role || "").toLowerCase() === "admin";
+
+  const isEventManageable = useCallback(
+    (ev) => {
+      if (isAdmin) return true;
+      if (!ev || !user) return false;
+      if (ev.created_by && Number(ev.created_by) === Number(user.id)) return true;
+      if (ev.organizer_email && user.email && ev.organizer_email.toLowerCase() === user.email.toLowerCase()) return true;
+      if (ev.organizer_name && user.name && ev.organizer_name.toLowerCase() === user.name.toLowerCase()) return true;
+      if (ev.organizer_department && user.department && ev.organizer_department.toLowerCase() === user.department.toLowerCase()) return true;
+      if (!ev.created_by && !ev.organizer_email) return true;
+      return false;
+    },
+    [isAdmin, user]
+  );
 
   const [events, setEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsError, setEventsError] = useState(null);
   const [eventSearch, setEventSearch] = useState("");
+  const [regsError, setRegsError] = useState(null);
 
   // Selected event ID
   const [selectedEventId, setSelectedEventId] = useState(
@@ -79,8 +98,9 @@ export default function FacultyRegistrations() {
         sort_order: "desc",
       });
       const items = data.items || [];
-      setEvents(items);
-      if (showToast) toast.success(`Loaded ${items.length} events`);
+      const manageable = isAdmin ? items : items.filter(isEventManageable);
+      setEvents(manageable);
+      if (showToast) toast.success(`Loaded ${manageable.length} events`);
     } catch (err) {
       console.error("Events load error:", err);
       const detail = err.response?.data?.detail || "Unable to load events. Please retry.";
@@ -102,7 +122,10 @@ export default function FacultyRegistrations() {
       if (!document.hidden) {
         eventService
           .list({ page: 1, page_size: 100, sort_by: "created_at", sort_order: "desc" })
-          .then(({ data }) => setEvents(data.items || []))
+          .then(({ data }) => {
+            const items = data.items || [];
+            setEvents(isAdmin ? items : items.filter(isEventManageable));
+          })
           .catch(() => {});
       }
     }, 4000);
@@ -123,6 +146,7 @@ export default function FacultyRegistrations() {
     async (showLoading = true) => {
       if (!selectedEventId) return;
       if (showLoading) setLoadingRegs(true);
+      setRegsError(null);
       try {
         const [regsRes, branchStatsRes, capRes, evRes] = await Promise.allSettled([
           registrationService.forEvent(selectedEventId),
@@ -133,6 +157,11 @@ export default function FacultyRegistrations() {
 
         if (regsRes.status === "fulfilled") {
           setRegs(regsRes.value.data || []);
+        } else {
+          const detail = regsRes.reason?.response?.data?.detail || "Could not load registrations for this event.";
+          setRegsError(detail);
+          setRegs([]);
+          toast.error(detail);
         }
         if (branchStatsRes.status === "fulfilled") {
           setBranchStats(branchStatsRes.value.data);
@@ -297,6 +326,18 @@ export default function FacultyRegistrations() {
       );
     });
   }, [regs, activeFilter, selectedBranch, studentSearch]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeFilter, selectedBranch, studentSearch, selectedEventId]);
+
+  const paginatedRegs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredRegs.slice(start, start + pageSize);
+  }, [filteredRegs, currentPage, pageSize]);
 
   // Report PDF / Export helper
   const handleExport = (type = "all") => {
@@ -906,6 +947,36 @@ export default function FacultyRegistrations() {
             </div>
           )}
 
+          {regsError && (
+            <div
+              style={{
+                padding: "16px 20px",
+                marginBottom: 24,
+                borderRadius: "16px",
+                background: "rgba(239, 68, 68, 0.12)",
+                border: "1px solid rgba(239, 68, 68, 0.3)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 12,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#f87171" }}>
+                <FiAlertCircle size={20} />
+                <span style={{ fontSize: 14, fontWeight: 500 }}>{regsError}</span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => loadEventRegistrations(true)}
+                style={{ borderColor: "rgba(239, 68, 68, 0.4)", color: "#f87171" }}
+              >
+                Retry Request
+              </button>
+            </div>
+          )}
+
           {/* ========================================================================= */}
           {/* BRANCH-WISE REGISTRATIONS & DYNAMIC ANALYTICS SECTION                     */}
           {/* ========================================================================= */}
@@ -1259,6 +1330,7 @@ export default function FacultyRegistrations() {
                   <th>Registration Date</th>
                   <th>Ticket / Pass</th>
                   <th>Status</th>
+                  <th>Attendance</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -1267,7 +1339,7 @@ export default function FacultyRegistrations() {
                   <SkeletonRow />
                 ) : filteredRegs.length === 0 ? (
                   <tr>
-                    <td colSpan={8} style={{ padding: 0 }}>
+                    <td colSpan={9} style={{ padding: 0 }}>
                       <EmptyState
                         icon={<FiUsers />}
                         title="No registrations found"
@@ -1295,11 +1367,12 @@ export default function FacultyRegistrations() {
                     </td>
                   </tr>
                 ) : (
-                  filteredRegs.map((r) => {
+                  paginatedRegs.map((r) => {
                     const st = String(r.status || "registered").toLowerCase();
                     const isPending = st === "pending" || st === "registered";
                     const isApproved = st === "approved";
                     const isCancelled = st === "cancelled";
+                    const isAttended = st === "attended" || st === "completed" || Boolean(r.checked_in_at);
 
                     return (
                       <tr key={r.id}>
@@ -1378,6 +1451,41 @@ export default function FacultyRegistrations() {
                           )}
                         </td>
                         <td>
+                          {isAttended ? (
+                            <div>
+                              <span
+                                className="badge badge-success"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                  background: "rgba(34, 197, 94, 0.15)",
+                                  color: "#22c55e",
+                                  border: "1px solid rgba(34, 197, 94, 0.3)",
+                                }}
+                              >
+                                <FiCheck size={11} /> Attended
+                              </span>
+                              {r.checked_in_at && (
+                                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 3 }}>
+                                  {formatDate(r.checked_in_at)} {r.checked_in_by ? `(${r.checked_in_by})` : ""}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span
+                              className="badge"
+                              style={{
+                                background: "rgba(148, 163, 184, 0.1)",
+                                color: "var(--text-muted)",
+                                border: "1px solid rgba(148, 163, 184, 0.2)",
+                              }}
+                            >
+                              Not Checked In
+                            </span>
+                          )}
+                        </td>
+                        <td>
                           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                             {isPending && (
                               <>
@@ -1443,6 +1551,14 @@ export default function FacultyRegistrations() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          <Pagination
+            page={currentPage}
+            pageSize={pageSize}
+            total={filteredRegs.length}
+            onPageChange={setCurrentPage}
+          />
         </div>
       )}
 

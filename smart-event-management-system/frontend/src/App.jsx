@@ -105,7 +105,6 @@ export default function App() {
             <Route path="approvals" element={<FacultyStudentApprovals />} />
             <Route path="events" element={<ManageEvents />} />
             <Route path="events/:id" element={<EventDetail embedded={true} />} />
-            <Route path="events/:id/report" element={<EventReviewReport />} />
             <Route path="registrations" element={<FacultyRegistrations />} />
             <Route path="registration-reports" element={<ManageRegistrations />} />
             <Route path="reports" element={<ManageRegistrations />} />

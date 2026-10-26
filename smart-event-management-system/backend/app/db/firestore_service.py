@@ -3929,23 +3929,59 @@ def get_event_report_data(event_id: int) -> Optional[dict]:
     return report
 
 
-def get_admin_analytics(time_range: Optional[str] = None, event_id: Optional[int] = None) -> dict:
+def get_admin_analytics(
+    time_range: Optional[str] = None,
+    event_id: Optional[int] = None,
+    category: Optional[str] = None,
+    registration_status: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+) -> dict:
     """
     Authoritative Admin analytics engine backed 100% by live Firestore records.
     Provides multi-dimensional metrics across all platform domains:
     Users, Events, Registrations, Attendance, Certificates, and Infrastructure.
-    Supports optional time_range ('7d', '30d', '90d', 'all') and event_id filtering.
+    Supports comprehensive filtering: time_range, event_id, category, registration_status, date_from, date_to.
+    Generates all 8 advanced chart suites and live database-backed KPI metrics.
     """
-    cache_key = f"admin_analytics:{time_range or 'all'}:{event_id or 'all'}"
+    cache_key = f"admin_analytics:{time_range}:{event_id}:{category}:{registration_status}:{date_from}:{date_to}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
     all_users = get_all_users()
     all_events = get_all_events()
-    if event_id:
-        all_events = [e for e in all_events if e.id == int(event_id)]
     all_assignments = get_all_assignments()
+
+    # Apply event category filter
+    if category and category.strip().lower() not in ("all", ""):
+        cat_lower = category.strip().lower()
+        all_events = [e for e in all_events if (e.category or "").strip().lower() == cat_lower]
+
+    # Apply event ID filter
+    if event_id:
+        try:
+            eid_num = int(event_id)
+            all_events = [e for e in all_events if e.id == eid_num]
+        except (ValueError, TypeError):
+            pass
+
+    # Apply event date range filters
+    parsed_date_from = None
+    parsed_date_to = None
+    if date_from and date_from.strip():
+        try:
+            parsed_date_from = date.fromisoformat(date_from.strip()[:10])
+            all_events = [e for e in all_events if e.event_date and e.event_date >= parsed_date_from]
+        except Exception:
+            pass
+
+    if date_to and date_to.strip():
+        try:
+            parsed_date_to = date.fromisoformat(date_to.strip()[:10])
+            all_events = [e for e in all_events if e.event_date and e.event_date <= parsed_date_to]
+        except Exception:
+            pass
 
     cutoff_date = None
     if time_range == "7d":
@@ -3955,6 +3991,9 @@ def get_admin_analytics(time_range: Optional[str] = None, event_id: Optional[int
     elif time_range == "90d":
         cutoff_date = (datetime.now(timezone.utc) - timedelta(days=90)).date()
 
+    if parsed_date_from and (not cutoff_date or parsed_date_from > cutoff_date):
+        cutoff_date = parsed_date_from
+
     db = get_firestore_db()
 
     # User breakdown by role and status
@@ -3962,6 +4001,12 @@ def get_admin_analytics(time_range: Optional[str] = None, event_id: Optional[int
     faculty = [u for u in all_users if u.role == RoleEnum.faculty]
     volunteers = [u for u in all_users if u.role == RoleEnum.volunteer]
     admins = [u for u in all_users if u.role == RoleEnum.admin]
+
+    active_volunteers = sum(
+        1 for v in volunteers
+        if getattr(v, "is_active", True)
+        and (getattr(v, "approval_status", "") or "APPROVED").upper() in ("APPROVED", "ACTIVE")
+    )
 
     approved_users = sum(1 for u in all_users if (u.approval_status or "PENDING").upper() in ("APPROVED", "ACTIVE") or u.role == RoleEnum.admin)
     pending_users = sum(1 for u in all_users if (u.approval_status or "PENDING").upper() == "PENDING" and u.role != RoleEnum.admin)
@@ -3974,21 +4019,29 @@ def get_admin_analytics(time_range: Optional[str] = None, event_id: Optional[int
     completed_events = sum(1 for e in all_events if e.event_date and e.event_date < today)
     total_seat_capacity = sum(e.total_seats for e in all_events)
 
-    # Collect registrations across all events
-    total_registrations = 0
-    total_attended = 0
-    total_confirmed = 0
-    total_cancelled = 0
-    cat_map = defaultdict(lambda: {"events": 0, "registrations": 0, "attended": 0, "capacity": 0})
-    monthly_reg_growth = defaultdict(int)
-    top_events_list = []
+    valid_event_ids = {e.id for e in all_events if e.id is not None}
 
+    # Fetch registrations
     reg_docs = db.collection("registrations").stream()
     all_regs = [d.to_dict() for d in reg_docs]
 
-    if event_id:
-        all_regs = [r for r in all_regs if r.get("event_id") == int(event_id)]
-    if cutoff_date:
+    # Filter registrations by valid events
+    all_regs = [r for r in all_regs if r.get("event_id") in valid_event_ids]
+
+    # Filter registrations by status
+    if registration_status and registration_status.strip().lower() not in ("all", ""):
+        target_status = registration_status.strip().lower()
+        if target_status == "attended":
+            all_regs = [r for r in all_regs if bool(r.get("checked_in_at")) or str(r.get("status", "")).lower() in ("attended", "completed")]
+        elif target_status == "approved":
+            all_regs = [r for r in all_regs if str(r.get("status", "")).lower() in ("approved", "confirmed")]
+        elif target_status == "pending":
+            all_regs = [r for r in all_regs if str(r.get("status", "")).lower() in ("pending", "registered")]
+        elif target_status == "cancelled":
+            all_regs = [r for r in all_regs if str(r.get("status", "")).lower() == "cancelled"]
+
+    # Filter registrations by registration date
+    if cutoff_date or parsed_date_to:
         filtered_regs = []
         for r in all_regs:
             reg_at = r.get("registered_at")
@@ -3998,39 +4051,68 @@ def get_admin_analytics(time_range: Optional[str] = None, event_id: Optional[int
                         r_date = reg_at.date()
                     else:
                         r_date = datetime.fromisoformat(str(reg_at)[:10]).date()
-                    if r_date >= cutoff_date:
-                        filtered_regs.append(r)
+                    if cutoff_date and r_date < cutoff_date:
+                        continue
+                    if parsed_date_to and r_date > parsed_date_to:
+                        continue
+                    filtered_regs.append(r)
                 except Exception:
                     filtered_regs.append(r)
             else:
                 filtered_regs.append(r)
         all_regs = filtered_regs
 
+    # Metrics calculation
+    total_registrations = 0
+    total_attended = 0
+    total_confirmed = 0
+    total_cancelled = 0
+    total_pending = 0
+    distinct_students = set()
+
+    daily_reg_counts = defaultdict(int)
+    monthly_participation = defaultdict(lambda: {"registrations": 0, "attended": 0})
+    cat_map = defaultdict(lambda: {"events": 0, "registrations": 0, "attended": 0, "capacity": 0})
+    top_events_list = []
+
     for r in all_regs:
-        status = r.get("status", "registered")
+        status = str(r.get("status", "registered")).lower()
         checked_in = bool(r.get("checked_in_at")) or status in ("attended", "completed")
+        s_id = r.get("student_id")
 
         if status != "cancelled":
             total_registrations += 1
+            if s_id:
+                distinct_students.add(s_id)
             if checked_in:
                 total_attended += 1
             if status in ("approved", "attended", "completed", "confirmed"):
                 total_confirmed += 1
+            if status in ("pending", "registered"):
+                total_pending += 1
 
             reg_at = r.get("registered_at")
             if reg_at:
                 if hasattr(reg_at, "strftime"):
                     d_str = reg_at.strftime("%Y-%m-%d")
+                    m_str = reg_at.strftime("%b %Y")
                 else:
                     d_str = str(reg_at)[:10]
-                monthly_reg_growth[d_str] += 1
+                    try:
+                        m_str = datetime.fromisoformat(d_str).strftime("%b %Y")
+                    except Exception:
+                        m_str = d_str[:7]
+                daily_reg_counts[d_str] += 1
+                monthly_participation[m_str]["registrations"] += 1
+                if checked_in:
+                    monthly_participation[m_str]["attended"] += 1
         else:
             total_cancelled += 1
 
     # Event metrics & Category metrics
     for e in all_events:
-        e_regs = [r for r in all_regs if r.get("event_id") == e.id and r.get("status") != "cancelled"]
-        e_attended = sum(1 for r in e_regs if bool(r.get("checked_in_at")) or r.get("status") in ("attended", "completed"))
+        e_regs = [r for r in all_regs if r.get("event_id") == e.id and str(r.get("status", "")).lower() != "cancelled"]
+        e_attended = sum(1 for r in e_regs if bool(r.get("checked_in_at")) or str(r.get("status", "")).lower() in ("attended", "completed"))
         reg_count = len(e_regs)
 
         cat = e.category or "General"
@@ -4076,7 +4158,7 @@ def get_admin_analytics(time_range: Optional[str] = None, event_id: Optional[int
         for cat, v in sorted(cat_map.items(), key=lambda x: x[1]["registrations"], reverse=True)
     ]
 
-    # User registration growth timeline
+    # User timeline
     user_timeline = defaultdict(int)
     for u in all_users:
         if u.created_at:
@@ -4089,11 +4171,57 @@ def get_admin_analytics(time_range: Optional[str] = None, event_id: Optional[int
         cum_users += count
         user_growth_chart.append({"date": d_str, "new_users": count, "total_users": cum_users})
 
+    # Registration trends (Line chart) & Cumulative growth (Area chart)
     cum_regs = 0
     registration_growth_chart = []
-    for d_str, count in sorted(monthly_reg_growth.items(), key=lambda x: x[0]):
+    reg_trend_labels = []
+    reg_trend_daily = []
+    reg_trend_cumulative = []
+
+    for d_str, count in sorted(daily_reg_counts.items(), key=lambda x: x[0]):
         cum_regs += count
         registration_growth_chart.append({"date": d_str, "new_registrations": count, "cumulative_registrations": cum_regs})
+        reg_trend_labels.append(d_str)
+        reg_trend_daily.append(count)
+        reg_trend_cumulative.append(cum_regs)
+
+    # If no registrations yet, provide clean placeholder labels
+    if not reg_trend_labels:
+        reg_trend_labels = [today.strftime("%Y-%m-%d")]
+        reg_trend_daily = [0]
+        reg_trend_cumulative = [0]
+
+    # Grouped Bar: Top 6 Events (Registrations vs Attendance)
+    bar_events = top_events_list[:6]
+    event_bar_labels = [ev["title"][:22] + ("…" if len(ev["title"]) > 22 else "") for ev in bar_events]
+    event_bar_regs = [ev["registrations"] for ev in bar_events]
+    event_bar_att = [ev["attended"] for ev in bar_events]
+
+    # Donut: Registration Status Distribution
+    status_dist_labels = ["Approved", "Attended", "Pending", "Cancelled"]
+    status_dist_data = [total_confirmed, total_attended, total_pending, total_cancelled]
+    status_dist_colors = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444"]
+
+    # Donut: Category Distribution
+    cat_dist_labels = [c["category"] for c in category_analytics] or ["General"]
+    cat_dist_data = [c["events_count"] for c in category_analytics] or [len(all_events)]
+    cat_colors = ["#8b5cf6", "#06b6d4", "#f59e0b", "#ec4899", "#10b981", "#3b82f6", "#f97316", "#a855f7"]
+
+    # Horizontal Bar: Top Events Ranking
+    rank_events = top_events_list[:5]
+    rank_labels = [ev["title"][:20] + ("…" if len(ev["title"]) > 20 else "") for ev in rank_events]
+    rank_data = [ev["registrations"] for ev in rank_events]
+    rank_attended = [ev["attended"] for ev in rank_events]
+
+    # Attendance Ratio: Registered vs Attended
+    att_ratio_labels = ["Attended Participants", "Absent / Not Checked In"]
+    att_ratio_data = [total_attended, max(0, total_registrations - total_attended)]
+    att_ratio_colors = ["#10b981", "rgba(148, 163, 184, 0.25)"]
+
+    # Time-based Participation Timeline
+    timeline_labels = list(monthly_participation.keys()) or [today.strftime("%b %Y")]
+    timeline_regs = [monthly_participation[m]["registrations"] for m in timeline_labels]
+    timeline_att = [monthly_participation[m]["attended"] for m in timeline_labels]
 
     overall_occ = round((total_registrations / max(1, total_seat_capacity)) * 100, 1) if total_seat_capacity > 0 else 0.0
     overall_att = round((total_attended / max(1, total_registrations)) * 100, 1) if total_registrations > 0 else 0.0
@@ -4104,6 +4232,7 @@ def get_admin_analytics(time_range: Optional[str] = None, event_id: Optional[int
             "total_students": len(students),
             "total_faculty": len(faculty),
             "total_volunteers": len(volunteers),
+            "active_volunteers": active_volunteers,
             "total_admins": len(admins),
             "approved_users": approved_users,
             "pending_users": pending_users,
@@ -4114,9 +4243,11 @@ def get_admin_analytics(time_range: Optional[str] = None, event_id: Optional[int
             "completed_events": completed_events,
             "total_seat_capacity": total_seat_capacity,
             "total_registrations": total_registrations,
+            "total_registered_students": len(distinct_students) if distinct_students else total_registrations,
             "confirmed_registrations": total_confirmed,
             "cancelled_registrations": total_cancelled,
             "total_attendance": total_attended,
+            "attendance_rate": overall_att,
             "overall_occupancy_rate": overall_occ,
             "overall_attendance_rate": overall_att,
             "total_certificates_issued": total_certs,
@@ -4124,6 +4255,55 @@ def get_admin_analytics(time_range: Optional[str] = None, event_id: Optional[int
             "active_assignments": sum(1 for a in all_assignments if a.status in ("pending", "in_progress")),
             "completed_assignments": sum(1 for a in all_assignments if a.status == "completed"),
             "server_timestamp": datetime.now(timezone.utc).isoformat(),
+            "registration_growth_pct": round(((reg_trend_daily[-1] if reg_trend_daily else 0) / max(1, total_registrations)) * 100, 1) if total_registrations > 0 else 0.0,
+        },
+        "charts": {
+            # 1. Line chart: registration trends over time
+            "registration_trends": {
+                "labels": reg_trend_labels,
+                "data": reg_trend_daily,
+            },
+            # 2. Bar chart: registrations and attendance by event
+            "event_registrations_attendance": {
+                "labels": event_bar_labels,
+                "registrations": event_bar_regs,
+                "attended": event_bar_att,
+            },
+            # 3. Donut chart: registration status distribution
+            "registration_status_distribution": {
+                "labels": status_dist_labels,
+                "data": status_dist_data,
+                "colors": status_dist_colors,
+            },
+            # 4. Pie or donut chart: event category distribution
+            "category_distribution": {
+                "labels": cat_dist_labels,
+                "data": cat_dist_data,
+                "colors": cat_colors[:len(cat_dist_labels)],
+            },
+            # 5. Area chart: cumulative registration growth
+            "cumulative_registration_growth": {
+                "labels": reg_trend_labels,
+                "data": reg_trend_cumulative,
+            },
+            # 6. Horizontal bar chart: top events by registrations or attendance
+            "top_events_ranking": {
+                "labels": rank_labels,
+                "registrations": rank_data,
+                "attended": rank_attended,
+            },
+            # 7. Attendance chart: registered versus attended participants
+            "attendance_ratio": {
+                "labels": att_ratio_labels,
+                "data": att_ratio_data,
+                "colors": att_ratio_colors,
+            },
+            # 8. Time-based chart: event participation trends
+            "participation_timeline": {
+                "labels": timeline_labels,
+                "registrations": timeline_regs,
+                "attendees": timeline_att,
+            },
         },
         "role_distribution": [
             {"role": "Students", "count": len(students), "color": "#8b5cf6"},
@@ -4154,7 +4334,7 @@ def get_admin_analytics(time_range: Optional[str] = None, event_id: Optional[int
             "last_updated": datetime.now(timezone.utc).isoformat(),
         }
     }
-    cache.set(cache_key, res, ttl_seconds=10.0)
+    cache.set(cache_key, res, ttl_seconds=5.0)
     return res
 
 
