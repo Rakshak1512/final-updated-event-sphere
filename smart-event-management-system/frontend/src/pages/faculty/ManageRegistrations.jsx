@@ -95,14 +95,23 @@ export default function ManageRegistrations() {
     return () => clearInterval(interval);
   }, [selectedEventId]);
 
-  // Sync selectedEventId with URL search params
+  // Keep selectedEventId in sync when user navigates with browser Back/Forward buttons
   useEffect(() => {
-    if (selectedEventId) {
-      setSearchParams({ eventId: selectedEventId }, { replace: true });
-    } else {
-      setSearchParams({}, { replace: true });
+    const qId = searchParams.get("eventId") || "";
+    if (qId !== selectedEventId) {
+      setSelectedEventId(qId);
     }
-  }, [selectedEventId, setSearchParams]);
+  }, [searchParams]);
+
+  // Sync selectedEventId into URL search params without breaking back stack
+  useEffect(() => {
+    const currentQ = searchParams.get("eventId") || "";
+    if (selectedEventId && currentQ !== selectedEventId) {
+      setSearchParams({ eventId: selectedEventId });
+    } else if (!selectedEventId && currentQ) {
+      setSearchParams({});
+    }
+  }, [selectedEventId, setSearchParams, searchParams]);
 
   // Load Registrations for Selected Event
   const loadEventRegistrations = useCallback(

@@ -22,6 +22,7 @@ import Pagination from "../../components/ui/Pagination.jsx";
 import { SkeletonGrid } from "../../components/ui/Loader.jsx";
 import EventImage from "../../components/common/EventImage.jsx";
 import EventPosterDesigner from "../../components/events/EventPosterDesigner.jsx";
+import EventReportModal from "../../components/events/EventReportModal.jsx";
 import { eventService } from "../../api/services.js";
 import { fileUrl, formatDate } from "../../utils/format.js";
 
@@ -60,6 +61,9 @@ export default function ManageEvents() {
   const [historyModalTarget, setHistoryModalTarget] = useState(null);
   const [historyList, setHistoryList] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  // Event Report Modal State
+  const [reportModalTarget, setReportModalTarget] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -309,6 +313,14 @@ export default function ManageEvents() {
                   <div style={{ marginTop: "auto", display: "flex", gap: 6, flexWrap: "wrap" }}>
                     <button className="btn btn-outline btn-sm" style={{ flex: 1 }} onClick={() => openEdit(ev)}>
                       <FiEdit2 size={13} /> Edit
+                    </button>
+                    <button
+                      className="btn btn-outline btn-sm"
+                      title="View Live Event Report & PDF"
+                      onClick={() => setReportModalTarget(ev)}
+                      style={{ color: "#a855f7", borderColor: "rgba(168, 85, 247, 0.4)" }}
+                    >
+                      <FiFileText size={13} /> Report
                     </button>
                     <button className="btn btn-outline btn-sm" title="View Edit History" onClick={() => openHistory(ev)}>
                       <FiClock size={13} /> History
@@ -641,6 +653,14 @@ export default function ManageEvents() {
           </button>
         </div>
       </Modal>
+
+      {/* EVENT COMPREHENSIVE REPORT MODAL */}
+      <EventReportModal
+        isOpen={!!reportModalTarget}
+        eventId={reportModalTarget?.id}
+        eventTitle={reportModalTarget?.title}
+        onClose={() => setReportModalTarget(null)}
+      />
 
       <style>{`
         @media (max-width: 560px) {

@@ -225,12 +225,29 @@ export default function EventDetail({ embedded = false }) {
     }
   };
 
-  const backLink = user?.role === "student" ? "/student/events" : user?.role === "faculty" ? "/faculty/events" : "/events";
+  const backLink =
+    user?.role === "student"
+      ? "/student/events"
+      : user?.role === "faculty"
+      ? "/faculty/events"
+      : user?.role === "admin"
+      ? "/admin/events"
+      : user?.role === "volunteer"
+      ? "/volunteer/events"
+      : "/events";
+
+  const handleBackNavigation = (e) => {
+    if (window.history.state && typeof window.history.state.idx === "number" && window.history.state.idx > 0) {
+      e.preventDefault();
+      navigate(-1);
+    }
+  };
 
   const content = (
     <>
       <Link
         to={backLink}
+        onClick={handleBackNavigation}
         className="btn btn-outline btn-sm"
         style={{ marginBottom: 24, width: "fit-content", display: "inline-flex", alignItems: "center", gap: 8 }}
       >

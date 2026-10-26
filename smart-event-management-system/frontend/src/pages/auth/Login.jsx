@@ -13,9 +13,28 @@ import { authService } from "../../api/services.js";
 const VALID_ROLES = ["student", "faculty", "volunteer", "admin"];
 
 export default function Login() {
-  const { login } = useAuth();
+  const { user, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const getDashboardDestination = (currUser) => {
+    const userRole = (currUser?.role || "").toLowerCase();
+    const status = (currUser?.approval_status || (userRole === "admin" ? "APPROVED" : "PENDING")).toUpperCase();
+    if (userRole !== "admin" && status !== "APPROVED" && status !== "ACTIVE") {
+      return "/awaiting-approval";
+    }
+    if (userRole === "admin") return "/admin/dashboard";
+    if (userRole === "faculty") return "/faculty/dashboard";
+    if (userRole === "volunteer") return "/volunteer/dashboard";
+    return "/student/dashboard";
+  };
+
+  // If already logged in, redirect away from /login
+  useEffect(() => {
+    if (user) {
+      navigate(getDashboardDestination(user), { replace: true });
+    }
+  }, [user, navigate]);
 
   const getInitialRole = () => {
     const params = new URLSearchParams(location.search);
@@ -51,18 +70,6 @@ export default function Login() {
 
   const update = (field) => (e) =>
     setForm((f) => ({ ...f, [field]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
-
-  const getDashboardDestination = (user) => {
-    const userRole = (user?.role || "").toLowerCase();
-    const status = (user?.approval_status || (userRole === "admin" ? "APPROVED" : "PENDING")).toUpperCase();
-    if (userRole !== "admin" && status !== "APPROVED" && status !== "ACTIVE") {
-      return "/awaiting-approval";
-    }
-    if (userRole === "admin") return "/admin/dashboard";
-    if (userRole === "faculty") return "/faculty/dashboard";
-    if (userRole === "volunteer") return "/volunteer/dashboard";
-    return "/student/dashboard";
-  };
 
   const getAuthErrorMessage = (err) => {
     if (!err) return "Login failed. Please check your credentials.";
@@ -251,8 +258,11 @@ export default function Login() {
         <button
           type="button"
           onClick={() => {
-            if (window.history.length > 1) navigate(-1);
-            else navigate("/");
+            if (window.history.state && typeof window.history.state.idx === "number" && window.history.state.idx > 0) {
+              navigate(-1);
+            } else {
+              navigate("/");
+            }
           }}
           aria-label="Go back"
           title="Go back"

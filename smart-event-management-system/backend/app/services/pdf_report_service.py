@@ -4,6 +4,7 @@ Generates institutional approval reports for students and faculty using ReportLa
 """
 from datetime import datetime, timezone
 import io
+import os
 from typing import List, Optional
 
 from reportlab.lib import colors
@@ -14,6 +15,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 from reportlab.platypus import (
     HRFlowable,
+    Image as RLImage,
     KeepTogether,
     Paragraph,
     SimpleDocTemplate,
@@ -705,3 +707,264 @@ def generate_volunteer_approval_pdf(volunteers: List[User], report_type_label: s
     doc.build(story, canvasmaker=NumberedCanvas)
     buffer.seek(0)
     return buffer.read()
+
+
+def _find_logo_image():
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "frontend", "public", "eventsphere-logo-master.png"),
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "frontend", "public", "apple-touch-icon.png"),
+        os.path.abspath("smart-event-management-system/frontend/public/eventsphere-logo-master.png"),
+        os.path.abspath("smart-event-management-system/frontend/public/apple-touch-icon.png"),
+        "smart-event-management-system/frontend/public/apple-touch-icon.png",
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            try:
+                return RLImage(c, width=22 * mm, height=22 * mm)
+            except Exception:
+                pass
+    return None
+
+
+def generate_event_report_pdf(report_data: dict) -> bytes:
+    """
+    Generate authoritative, multi-page landscape A4 PDF report for a single event.
+    Includes EventSphere master branding, metadata, executive KPI summary,
+    department statistics, and complete attendee attendance roster.
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        leftMargin=14 * mm,
+        rightMargin=14 * mm,
+        topMargin=15 * mm,
+        bottomMargin=16 * mm,
+    )
+
+    styles = _get_report_styles()
+    story = []
+
+    event = report_data.get("event", {})
+    summary = report_data.get("summary", {})
+    attendees = report_data.get("attendees", [])
+    branches = report_data.get("branch_breakdown", [])
+
+    # 1. Header Banner with Brand Emblem Logo
+    logo_flowable = _find_logo_image()
+    title_text = f"<b>{str(event.get('title', 'Event')).upper()}</b>"
+
+    brand_sub = Paragraph("<b>EVENTSPHERE</b> &bull; Institutional Event Intelligence Report", styles["brand"])
+    ev_title_para = Paragraph(title_text, styles["title"])
+    meta_para = Paragraph(
+        f"<b>Generated:</b> {_format_datetime(datetime.now(timezone.utc))} &bull; <b>Status:</b> {str(event.get('status', 'Active')).upper()}",
+        styles["meta_val"],
+    )
+
+    if logo_flowable:
+        header_table = Table(
+            [[logo_flowable, [brand_sub, ev_title_para, meta_para]]],
+            colWidths=[26 * mm, 243 * mm],
+        )
+        header_table.setStyle(
+            TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ])
+        )
+    else:
+        header_table = Table([[[brand_sub, ev_title_para, meta_para]]], colWidths=[269 * mm])
+        header_table.setStyle(
+            TableStyle([
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ])
+        )
+
+    story.append(header_table)
+    story.append(Spacer(1, 3 * mm))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=HexColor("#6366f1"), spaceAfter=3 * mm))
+
+    # 2. Event Profile Card Table
+    coord_name = event.get("faculty_name") or event.get("organizer_name") or "Faculty Coordinator"
+    profile_data = [
+        [
+            Paragraph("<b>Event ID:</b>", styles["meta_label"]),
+            Paragraph(f"#{event.get('id', 'N/A')}", styles["meta_val"]),
+            Paragraph("<b>Date & Time:</b>", styles["meta_label"]),
+            Paragraph(f"{_format_date(event.get('event_date'))} at {event.get('event_time', 'TBD')}", styles["meta_val"]),
+            Paragraph("<b>Coordinator:</b>", styles["meta_label"]),
+            Paragraph(coord_name, styles["meta_val"]),
+        ],
+        [
+            Paragraph("<b>Category:</b>", styles["meta_label"]),
+            Paragraph(str(event.get("category", "General")), styles["meta_val"]),
+            Paragraph("<b>Venue:</b>", styles["meta_label"]),
+            Paragraph(str(event.get("venue", "Campus Venue")), styles["meta_val"]),
+            Paragraph("<b>Total Capacity:</b>", styles["meta_label"]),
+            Paragraph(f"{event.get('total_seats', 0)} Seats ({summary.get('available_seats', 0)} Available)", styles["meta_val"]),
+        ],
+    ]
+    prof_table = Table(profile_data, colWidths=[26 * mm, 60 * mm, 26 * mm, 66 * mm, 28 * mm, 63 * mm])
+    prof_table.setStyle(
+        TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#f8fafc")),
+            ("BOX", (0, 0), (-1, -1), 0.75, HexColor("#cbd5e1")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, HexColor("#e2e8f0")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ])
+    )
+    story.append(prof_table)
+    story.append(Spacer(1, 4 * mm))
+
+    # 3. Executive KPI Summary Cards Bar
+    kpi_cols = [
+        [Paragraph("<b>TOTAL REGISTRATIONS</b>", styles["meta_label"]), Paragraph(f"<font size=12 color='#4f46e5'><b>{summary.get('total_registrations', 0)}</b></font>", styles["title"])],
+        [Paragraph("<b>APPROVED / CONFIRMED</b>", styles["meta_label"]), Paragraph(f"<font size=12 color='#059669'><b>{summary.get('confirmed_registrations', 0)}</b></font>", styles["title"])],
+        [Paragraph("<b>PRESENT ATTENDEES</b>", styles["meta_label"]), Paragraph(f"<font size=12 color='#0284c7'><b>{summary.get('present_attendees', 0)}</b></font>", styles["title"])],
+        [Paragraph("<b>ABSENT ATTENDEES</b>", styles["meta_label"]), Paragraph(f"<font size=12 color='#d97706'><b>{summary.get('absent_attendees', 0)}</b></font>", styles["title"])],
+        [Paragraph("<b>ATTENDANCE RATE</b>", styles["meta_label"]), Paragraph(f"<font size=12 color='#7c3aed'><b>{summary.get('attendance_rate', 0)}%</b></font>", styles["title"])],
+        [Paragraph("<b>CERTIFICATES ISSUED</b>", styles["meta_label"]), Paragraph(f"<font size=12 color='#0d9488'><b>{summary.get('certificates_issued', 0)}</b></font>", styles["title"])],
+    ]
+    kpi_card_table = Table([[c[0] for c in kpi_cols], [c[1] for c in kpi_cols]], colWidths=[44.8 * mm] * 6)
+    kpi_card_table.setStyle(
+        TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#f1f5f9")),
+            ("BOX", (0, 0), (-1, -1), 0.75, HexColor("#cbd5e1")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, HexColor("#e2e8f0")),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ])
+    )
+    story.append(kpi_card_table)
+    story.append(Spacer(1, 4 * mm))
+
+    # 4. Department Roster Table (if branch breakdown exists)
+    if branches and len(branches) > 0:
+        story.append(Paragraph("<b>Department Participation Breakdown</b>", styles["cell_bold"]))
+        story.append(Spacer(1, 1.5 * mm))
+        branch_rows = [
+            [
+                Paragraph("<b>Department</b>", styles["th"]),
+                Paragraph("<b>Registered</b>", styles["th"]),
+                Paragraph("<b>Attended</b>", styles["th"]),
+                Paragraph("<b>Certificates</b>", styles["th"]),
+                Paragraph("<b>Turnout Rate</b>", styles["th"]),
+            ]
+        ]
+        for b in branches[:6]:
+            att_pct = round((b['attended'] / max(1, b['registered'])) * 100, 1) if b['registered'] > 0 else 0.0
+            branch_rows.append([
+                Paragraph(str(b.get("department", "General")), styles["cell"]),
+                Paragraph(str(b.get("registered", 0)), styles["cell"]),
+                Paragraph(str(b.get("attended", 0)), styles["cell"]),
+                Paragraph(str(b.get("certificates", 0)), styles["cell"]),
+                Paragraph(f"{att_pct}%", styles["cell_bold"]),
+            ])
+        branch_table = Table(branch_rows, colWidths=[90 * mm, 45 * mm, 45 * mm, 45 * mm, 44 * mm])
+        b_style = [
+            ("BACKGROUND", (0, 0), (-1, 0), HexColor("#4338ca")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("BOX", (0, 0), (-1, -1), 0.5, HexColor("#cbd5e1")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, HexColor("#e2e8f0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ]
+        for i in range(1, len(branch_rows)):
+            b_style.append(("BACKGROUND", (0, i), (-1, i), HexColor("#f8fafc") if i % 2 == 0 else colors.white))
+        branch_table.setStyle(TableStyle(b_style))
+        story.append(branch_table)
+        story.append(Spacer(1, 4 * mm))
+
+    # 5. Full Attendee Registration & Attendance Roster
+    story.append(Paragraph(f"<b>Attendee Roster & Attendance Verification Log ({len(attendees)} Total)</b>", styles["cell_bold"]))
+    story.append(Spacer(1, 1.5 * mm))
+
+    roster_rows = [
+        [
+            Paragraph("<b>#</b>", styles["th"]),
+            Paragraph("<b>Student Name</b>", styles["th"]),
+            Paragraph("<b>Reg. No / ID</b>", styles["th"]),
+            Paragraph("<b>Department</b>", styles["th"]),
+            Paragraph("<b>Ticket Code</b>", styles["th"]),
+            Paragraph("<b>Status</b>", styles["th"]),
+            Paragraph("<b>Attendance</b>", styles["th"]),
+            Paragraph("<b>Verified Time</b>", styles["th"]),
+            Paragraph("<b>Certificate</b>", styles["th"]),
+        ]
+    ]
+
+    col_widths = [10 * mm, 45 * mm, 32 * mm, 38 * mm, 28 * mm, 26 * mm, 28 * mm, 34 * mm, 28 * mm]
+
+    for idx, a in enumerate(attendees, 1):
+        is_pres = a.get("attendance_status") == "Present"
+        att_style = styles["approved"] if is_pres else styles["pending"]
+        cert_style = styles["approved"] if a.get("certificate_issued") else styles["cell_muted"]
+
+        chk_time = "—"
+        if a.get("checked_in_at"):
+            try:
+                dt = datetime.fromisoformat(a["checked_in_at"].replace("Z", "+00:00"))
+                chk_time = dt.strftime("%b %d, %H:%M")
+            except Exception:
+                chk_time = str(a["checked_in_at"])[:16]
+
+        roster_rows.append([
+            Paragraph(str(idx), styles["cell_muted"]),
+            Paragraph(f"<b>{a.get('student_name', 'Student')}</b>", styles["cell_bold"]),
+            Paragraph(f"<font face='Courier'>{a.get('registration_number', 'N/A')}</font>", styles["cell"]),
+            Paragraph(str(a.get("department", "General")), styles["cell"]),
+            Paragraph(f"<font face='Courier'>{a.get('ticket_code', '—')}</font>", styles["cell_muted"]),
+            Paragraph(str(a.get("status", "registered")).capitalize(), styles["cell"]),
+            Paragraph(f"<b>{a.get('attendance_status', 'Absent')}</b>", att_style),
+            Paragraph(chk_time, styles["cell_muted"]),
+            Paragraph("Issued" if a.get("certificate_issued") else "Not Issued", cert_style),
+        ])
+
+    if len(attendees) == 0:
+        roster_rows.append([
+            Paragraph("—", styles["cell_muted"]),
+            Paragraph("No student registrations recorded for this event yet.", styles["cell_muted"]),
+            Paragraph("—", styles["cell_muted"]),
+            Paragraph("—", styles["cell_muted"]),
+            Paragraph("—", styles["cell_muted"]),
+            Paragraph("—", styles["cell_muted"]),
+            Paragraph("—", styles["cell_muted"]),
+            Paragraph("—", styles["cell_muted"]),
+            Paragraph("—", styles["cell_muted"]),
+        ])
+
+    data_table = Table(roster_rows, colWidths=col_widths, repeatRows=1)
+    t_style = [
+        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#1e1b4b")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3.5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3.5),
+        ("BOX", (0, 0), (-1, -1), 0.5, HexColor("#cbd5e1")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.5, HexColor("#e2e8f0")),
+    ]
+    for i in range(1, len(roster_rows)):
+        t_style.append(("BACKGROUND", (0, i), (-1, i), HexColor("#f8fafc") if i % 2 == 0 else colors.white))
+
+    data_table.setStyle(TableStyle(t_style))
+    story.append(data_table)
+
+    doc.build(story, canvasmaker=NumberedCanvas)
+    buffer.seek(0)
+    return buffer.read()
+

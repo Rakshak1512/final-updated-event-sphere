@@ -53,12 +53,29 @@ export default function PageLoader() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 12,
+        gap: 16,
         color: "var(--text-secondary)",
       }}
     >
-      <Spinner size={36} />
-      <span style={{ fontSize: 13, fontWeight: 500 }}>Loading EventSphere...</span>
+      <div style={{ position: "relative", width: 48, height: 48 }}>
+        <img
+          src="/eventsphere-emblem.png"
+          alt="EventSphere"
+          style={{
+            width: 48,
+            height: 48,
+            objectFit: "contain",
+            filter: "drop-shadow(0 4px 16px rgba(139, 92, 246, 0.5))",
+            animation: "pulse 1.8s ease-in-out infinite",
+          }}
+        />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <Spinner size={18} />
+        <span style={{ fontSize: 13.5, fontWeight: 600, letterSpacing: "-0.01em" }}>
+          Loading Event<span className="text-gradient">Sphere</span>...
+        </span>
+      </div>
     </div>
   );
 }

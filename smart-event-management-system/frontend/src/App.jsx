@@ -33,6 +33,7 @@ const FacultyResults = lazy(() => import("./pages/faculty/Results.jsx"));
 const AssignedTasks = lazy(() => import("./pages/faculty/AssignedTasks.jsx"));
 
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard.jsx"));
+const AdminAnalyticsDashboard = lazy(() => import("./pages/admin/AdminAnalyticsDashboard.jsx"));
 const AdminFacultyApprovals = lazy(() => import("./pages/admin/FacultyApprovals.jsx"));
 const FacultyList = lazy(() => import("./pages/admin/FacultyList.jsx"));
 const AdminAssignments = lazy(() => import("./pages/admin/Assignments.jsx"));
@@ -118,6 +119,7 @@ export default function App() {
           <Route path="/admin" element={<DashboardLayout role="admin" />}>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="analytics" element={<AdminAnalyticsDashboard />} />
             <Route path="faculty-approvals" element={<AdminFacultyApprovals />} />
             <Route path="approvals" element={<AdminFacultyApprovals />} />
             <Route path="faculty" element={<FacultyList />} />

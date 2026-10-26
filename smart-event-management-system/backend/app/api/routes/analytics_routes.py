@@ -27,3 +27,12 @@ def faculty_analytics(
         faculty_id=current_user.id,
     )
     return FacultyAnalytics(**data)
+
+
+@router.get("/admin")
+def admin_analytics(
+    current_user: User = Depends(require_role(RoleEnum.admin)),
+):
+    data = db_service.get_admin_analytics()
+    return data
+

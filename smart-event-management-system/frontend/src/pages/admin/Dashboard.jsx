@@ -109,6 +109,21 @@ export default function AdminDashboard() {
         </div>
 
         <div className="btn-group" style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <Link
+            to="/admin/analytics"
+            className="btn btn-sm"
+            style={{
+              background: "linear-gradient(135deg, #06b6d4, #3b82f6)",
+              color: "#ffffff",
+              fontWeight: 600,
+              boxShadow: "0 4px 12px rgba(6, 182, 212, 0.3)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <FiAward /> Live Analytics
+          </Link>
           <Link to="/admin/faculty-approvals" className="btn btn-primary btn-sm">
             <FiShield /> Faculty Approvals
           </Link>

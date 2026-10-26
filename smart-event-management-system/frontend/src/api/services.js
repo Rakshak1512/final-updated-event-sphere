@@ -34,6 +34,16 @@ export const eventService = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
   remove: (id) => api.delete(`/events/${id}`),
+  getReport: (id) => api.get(`/events/${id}/report`),
+  downloadReportPdf: async (id, eventTitle = "Event") => {
+    const response = await api.get(`/events/${id}/report/pdf`, {
+      responseType: "blob",
+    });
+    const sanitizedTitle = (eventTitle || "Event").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const filename = `EventSphere_Event_Report_${sanitizedTitle}_${id.substring(0, 8)}.pdf`;
+    await downloadBlobOrFile(response.data, filename, "application/pdf");
+    return { success: true, data: response.data };
+  },
 };
 
 /* ---------------- Registrations & Teams ---------------- */
@@ -161,6 +171,7 @@ export const notificationService = {
 
 /* ---------------- Analytics ---------------- */
 export const analyticsService = {
+  admin: () => api.get("/analytics/admin"),
   student: () => api.get("/analytics/student"),
   faculty: () => api.get("/analytics/faculty"),
 };
@@ -240,6 +251,7 @@ export const adminService = {
     await downloadBlobOrFile(response.data, filename, "application/pdf");
     return { success: true, data: response.data };
   },
+  analytics: () => api.get("/analytics/admin"),
 };
 
 /* ---------------- Faculty Approval Services ---------------- */

@@ -46,6 +46,7 @@ const facultyItems = (base) => [
 
 const adminItems = (base) => [
   { to: `${base}/dashboard`, label: "Overview", icon: FiHome, end: true },
+  { to: `${base}/analytics`, label: "Live Analytics", icon: FiUploadCloud },
   { to: `${base}/faculty-approvals`, label: "Faculty Approvals", icon: FiShield },
   { to: `${base}/faculty`, label: "Faculty Directory", icon: FiUsers },
   { to: `${base}/assignments`, label: "Work Assignments", icon: FiCheckSquare },

@@ -188,7 +188,13 @@ export default function VerifyEmail() {
           {/* Back button aligned inside card */}
           <button
             type="button"
-            onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/register"))}
+            onClick={() => {
+              if (window.history.state && typeof window.history.state.idx === "number" && window.history.state.idx > 0) {
+                navigate(-1);
+              } else {
+                navigate("/register");
+              }
+            }}
             aria-label="Go back"
             title="Go back"
             style={{

@@ -185,25 +185,18 @@ export default function AwaitingApproval() {
         >
           {/* Header Brand */}
           <div style={{ marginBottom: 28, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-            <span
+            <img
+              src="/eventsphere-emblem.png"
+              alt="EventSphere Logo"
               style={{
                 width: 36,
                 height: 36,
-                borderRadius: 10,
-                background: "linear-gradient(135deg, #8b5cf6, #3b82f6)",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#ffffff",
-                fontWeight: 800,
-                fontSize: 18,
-                boxShadow: "0 4px 12px rgba(139, 92, 246, 0.35)",
+                objectFit: "contain",
+                filter: "drop-shadow(0 4px 12px rgba(139, 92, 246, 0.45))",
               }}
-            >
-              E
-            </span>
+            />
             <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.5, color: "var(--text-primary, #ffffff)" }}>
-              Event<span style={{ color: "#8b5cf6" }}>Sphere</span>
+              Event<span className="text-gradient">Sphere</span>
             </span>
           </div>
 

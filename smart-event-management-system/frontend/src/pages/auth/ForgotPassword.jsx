@@ -252,10 +252,10 @@ export default function ForgotPassword() {
               if (step === "verify") setStep("request");
               else if (step === "reset") setStep("verify");
               else {
-                if (window.history.length > 1) {
+                if (window.history.state && typeof window.history.state.idx === "number" && window.history.state.idx > 0) {
                   navigate(-1);
                 } else {
-                  navigate("/", { replace: true });
+                  navigate("/login", { replace: true });
                 }
               }
             }}

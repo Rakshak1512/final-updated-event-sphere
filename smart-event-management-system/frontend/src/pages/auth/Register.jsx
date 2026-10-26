@@ -12,8 +12,24 @@ const departments = ["Computer Science", "Electronics", "Mechanical", "Civil", "
 const semesters = ["1", "2", "3", "4", "5", "6", "7", "8"];
 
 export default function Register() {
-  const { register } = useAuth();
+  const { user, register } = useAuth();
   const navigate = useNavigate();
+
+  // If already logged in, redirect away from /register
+  useEffect(() => {
+    if (user) {
+      const userRole = (user.role || "").toLowerCase();
+      const dest =
+        userRole === "admin"
+          ? "/admin/dashboard"
+          : userRole === "faculty"
+          ? "/faculty/dashboard"
+          : userRole === "volunteer"
+          ? "/volunteer/dashboard"
+          : "/student/dashboard";
+      navigate(dest, { replace: true });
+    }
+  }, [user, navigate]);
 
   const [form, setForm] = useState({
     role: "student",
@@ -227,8 +243,11 @@ export default function Register() {
           <button
             type="button"
             onClick={() => {
-              if (window.history.length > 1) navigate(-1);
-              else navigate("/", { replace: true });
+              if (window.history.state && typeof window.history.state.idx === "number" && window.history.state.idx > 0) {
+                navigate(-1);
+              } else {
+                navigate("/", { replace: true });
+              }
             }}
             aria-label="Go back"
             title="Go back"

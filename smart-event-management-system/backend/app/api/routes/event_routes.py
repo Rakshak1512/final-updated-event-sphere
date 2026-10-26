@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 
 from app.db import firestore_service as db_service
 from app.dependencies import require_role
@@ -12,6 +12,7 @@ from app.schemas.event_schema import (
     EventOut,
     PaginatedEvents,
 )
+from app.services.pdf_report_service import generate_event_report_pdf
 from app.utils.file_utils import delete_file_if_exists, save_upload
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
@@ -245,3 +246,87 @@ def delete_event(
 
     db_service.delete_event(event_id)
     return {"message": "Event deleted successfully"}
+
+
+def _check_event_report_access(event, current_user: User):
+    """
+    Ensures Admin can access all event reports, while Faculty can only access
+    reports for events created by them, organized by them, or within their department.
+    """
+    if current_user.role == RoleEnum.admin:
+        return True
+    if current_user.role == RoleEnum.faculty:
+        if event.created_by == current_user.id:
+            return True
+        if getattr(event, "organizer_name", None) and (current_user.name and current_user.name.strip().lower() in event.organizer_name.strip().lower()):
+            return True
+        if getattr(event, "organizer_department", None) and getattr(current_user, "department", None):
+            if event.organizer_department.strip().lower() == current_user.department.strip().lower():
+                return True
+        if not event.created_by:
+            return True
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You do not have authorization to view this event's report.",
+    )
+
+
+@router.get("/{event_id}/report")
+def get_event_report(
+    event_id: int,
+    current_user: User = Depends(require_role(RoleEnum.faculty, RoleEnum.admin)),
+):
+    """
+    Faculty Coordinator & Admin Event-Wise Reporting API.
+    Computes registration breakdowns, confirmed/attended numbers, attendance rate,
+    and attendee rosters from real Firestore database records.
+    """
+    event = db_service.get_event_by_id(event_id)
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    _check_event_report_access(event, current_user)
+
+    report = db_service.get_event_report_data(event_id)
+    if not report:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Could not compile report data for this event")
+    return report
+
+
+@router.get("/{event_id}/report/pdf")
+def download_event_report_pdf(
+    event_id: int,
+    current_user: User = Depends(require_role(RoleEnum.faculty, RoleEnum.admin)),
+):
+    """
+    Generates and downloads the official EventSphere Executive Event Report in PDF format.
+    Includes EventSphere branding, KPI summary cards, department distribution,
+    and complete verified attendee roster with NumberedCanvas pagination.
+    """
+    event = db_service.get_event_by_id(event_id)
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    _check_event_report_access(event, current_user)
+
+    report = db_service.get_event_report_data(event_id)
+    if not report:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Could not compile report data for this event")
+
+    pdf_bytes = generate_event_report_pdf(report)
+    filename = f"EventSphere_Event_Report_{event_id}.pdf"
+    from urllib.parse import quote
+    encoded_filename = quote(filename)
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Type": "application/pdf",
+            "Content-Disposition": f'attachment; filename="{filename}"; filename*=UTF-8\'\'{encoded_filename}',
+            "Access-Control-Expose-Headers": "Content-Disposition, Content-Type, Content-Length",
+            "Cache-Control": "private, no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+

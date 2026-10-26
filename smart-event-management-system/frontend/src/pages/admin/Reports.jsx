@@ -14,6 +14,7 @@ import {
 import { motion } from "framer-motion";
 import PageTransition from "../../components/common/PageTransition.jsx";
 import ReportConfigModal from "../../components/reports/ReportConfigModal.jsx";
+import EventReportModal from "../../components/events/EventReportModal.jsx";
 import {
   adminService,
   eventService,
@@ -28,6 +29,7 @@ export default function AdminReports() {
   const [downloading, setDownloading] = useState({});
   const [activeConfigReport, setActiveConfigReport] = useState(null);
   const [eventsList, setEventsList] = useState([]);
+  const [selectedEventReport, setSelectedEventReport] = useState(null);
 
   // Load events for event selector
   useEffect(() => {
@@ -647,6 +649,76 @@ export default function AdminReports() {
         </div>
       </div>
 
+      {/* EVENT-SPECIFIC EXECUTIVE REPORT SELECTOR (REQUIREMENT 4) */}
+      <div
+        className="glass-card"
+        style={{
+          padding: "20px 24px",
+          marginBottom: 28,
+          background: "linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(168, 85, 247, 0.08) 100%)",
+          border: "1px solid rgba(139, 92, 246, 0.3)",
+          boxShadow: "0 10px 30px rgba(139, 92, 246, 0.1)",
+        }}
+      >
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 12,
+                background: "linear-gradient(135deg, #6366f1, #a855f7)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#ffffff",
+                boxShadow: "0 6px 16px rgba(99, 102, 241, 0.3)",
+              }}
+            >
+              <FiFileText size={22} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: "#ffffff", margin: 0 }}>
+                Individual Event Executive Report & PDF
+              </h3>
+              <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "4px 0 0" }}>
+                Generate official ReportLab PDF reports containing event summaries, KPI analytics, and complete attendee rosters.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", width: "100%", maxWidth: 520 }}>
+            <select
+              className="form-input"
+              style={{ flex: 1, minWidth: 240, borderRadius: 10, padding: "9px 14px", background: "rgba(15, 23, 42, 0.8)" }}
+              value={selectedEventReport?.id || ""}
+              onChange={(e) => {
+                const ev = eventsList.find((item) => String(item.id) === e.target.value);
+                setSelectedEventReport(ev || null);
+              }}
+            >
+              <option value="">-- Select an Event to Inspect or Download PDF --</option>
+              {eventsList.map((ev) => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.title} ({ev.category} · {formatDate(ev.event_date)})
+                </option>
+              ))}
+            </select>
+
+            <button
+              className="btn btn-primary btn-sm"
+              disabled={!selectedEventReport}
+              onClick={() => {
+                // Keep selectedEventReport active to open modal
+              }}
+              style={{ padding: "9px 18px", borderRadius: 10, display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <FiEye size={15} /> View & Download PDF
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="grid-cards">
         {reportCards.map((rc, i) => (
           <motion.div
@@ -766,6 +838,14 @@ export default function AdminReports() {
           fetchDataFn={activeConfigReport.fetchDataFn}
         />
       )}
+
+      {/* Official Event Executive Report & PDF Modal */}
+      <EventReportModal
+        isOpen={Boolean(selectedEventReport)}
+        eventId={selectedEventReport?.id}
+        eventTitle={selectedEventReport?.title}
+        onClose={() => setSelectedEventReport(null)}
+      />
     </PageTransition>
   );
 }
