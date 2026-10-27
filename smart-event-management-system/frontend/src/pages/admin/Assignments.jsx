@@ -184,7 +184,7 @@ export default function AdminAssignments() {
     );
   });
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!assignments || assignments.length === 0) {
       toast.error("No assignment records available to export");
       return;
@@ -219,7 +219,8 @@ export default function AdminAssignments() {
       assignedBy: t.assigned_by_name || "Admin",
     }));
 
-    generateCustomReportPDF({
+    try {
+      await generateCustomReportPDF({
       title: "Faculty Assignments & Institutional Directives",
       subtitle: "Official Task Delegation, Deliverable Tracking & Completion Audit",
       filename,
@@ -237,9 +238,12 @@ export default function AdminAssignments() {
       ],
       columns: reportColumns,
       data: reportData,
-    });
-
-    toast.success(`Exported ${assignments.length} assignments to PDF`);
+      });
+      toast.success(`Exported ${assignments.length} assignments to PDF`);
+    } catch (err) {
+      console.error("Assignment PDF export failed:", err);
+      toast.error(err?.message || "Could not download assignments PDF.");
+    }
   };
 
   return (
