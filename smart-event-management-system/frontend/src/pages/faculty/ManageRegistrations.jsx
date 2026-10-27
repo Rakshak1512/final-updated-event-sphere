@@ -118,7 +118,7 @@ export default function ManageRegistrations() {
           })
           .catch(() => {});
       }
-    }, 4000);
+    }, 15000);
 
     return () => clearInterval(interval);
   }, [selectedEventId, isStaff, isEventManageable]);
