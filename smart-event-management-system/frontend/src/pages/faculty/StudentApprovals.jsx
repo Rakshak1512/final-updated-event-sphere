@@ -73,11 +73,16 @@ export default function StudentApprovals() {
 
   useEffect(() => {
     loadStudentApprovals(true);
-    // Background polling every 10 seconds for real-time incoming student approvals
+    // Poll less often while visible; pause network work in background tabs.
     const interval = setInterval(() => {
-      loadStudentApprovals(false);
-    }, 10000);
-    return () => clearInterval(interval);
+      if (!document.hidden) loadStudentApprovals(false);
+    }, 20000);
+    const handleFocus = () => loadStudentApprovals(false);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, [loadStudentApprovals]);
 
   // Handle Approve
