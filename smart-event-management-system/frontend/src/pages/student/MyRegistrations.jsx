@@ -171,7 +171,7 @@ export default function MyRegistrations() {
   };
 
   // Official PDF Registration Report for the student
-  const handleDownloadReportPDF = () => {
+  const handleDownloadReportPDF = async () => {
     if (!filteredRegs || filteredRegs.length === 0) {
       toast.error("No registration records found for current filter.");
       return;
@@ -214,7 +214,7 @@ export default function MyRegistrations() {
 
       const upcomingCount = filteredRegs.filter((r) => isUpcoming(r.event, (r.status || "").toLowerCase())).length;
 
-      generateCustomReportPDF({
+      await generateCustomReportPDF({
         title: "My Event Registrations Report",
         subtitle: `Official Registration Roster — ${user?.name || "Student"}`,
         headers,
