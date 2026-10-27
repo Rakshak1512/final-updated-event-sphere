@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import {
-  FiDownload,
   FiCheck,
   FiUpload,
   FiRefreshCw,
@@ -562,25 +561,6 @@ export default function EventPosterDesigner({
     );
   };
 
-  // Download high-resolution PNG
-  const handleDownloadPng = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const safeTitle = (headline || eventForm.title || "event_poster")
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "_")
-      .slice(0, 32);
-
-    const link = document.createElement("a");
-    link.download = `${safeTitle}_poster.png`;
-    link.href = canvas.toDataURL("image/png", 1.0);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Poster PNG downloaded successfully!");
-  };
-
   // Download high-resolution PDF
   const handleDownloadPdf = async () => {
     const canvas = canvasRef.current;
@@ -1102,16 +1082,8 @@ export default function EventPosterDesigner({
             <button
               type="button"
               className="btn btn-outline btn-sm"
-              onClick={handleDownloadPng}
-              style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-            >
-              <FiDownload size={14} /> Download PNG
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
               onClick={handleDownloadPdf}
-              style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+              style={{ flex: 1, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
             >
               <FiFileText size={14} /> Export PDF
             </button>
