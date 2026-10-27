@@ -116,6 +116,11 @@ export default function AssignedTasks() {
       >
         <div
           className="glass-card"
+          role="button"
+          tabIndex={0}
+          aria-label={`Show total tasks tasks`}
+          onClick={() => { setStatusFilter("all"); setSearchQuery(""); }}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setStatusFilter("all"); setSearchQuery(""); } }}
           style={{
             padding: "16px 20px",
             borderRadius: "16px",
@@ -123,6 +128,7 @@ export default function AssignedTasks() {
             alignItems: "center",
             gap: 14,
             borderLeft: "4px solid #8b5cf6",
+            cursor: "pointer",
           }}
         >
           <div
@@ -149,6 +155,11 @@ export default function AssignedTasks() {
 
         <div
           className="glass-card"
+          role="button"
+          tabIndex={0}
+          aria-label={`Show pending tasks`}
+          onClick={() => { setStatusFilter("pending"); setSearchQuery(""); }}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setStatusFilter("pending"); setSearchQuery(""); } }}
           style={{
             padding: "16px 20px",
             borderRadius: "16px",
@@ -156,6 +167,7 @@ export default function AssignedTasks() {
             alignItems: "center",
             gap: 14,
             borderLeft: "4px solid #f59e0b",
+            cursor: "pointer",
           }}
         >
           <div
@@ -182,6 +194,11 @@ export default function AssignedTasks() {
 
         <div
           className="glass-card"
+          role="button"
+          tabIndex={0}
+          aria-label={`Show in progress tasks`}
+          onClick={() => { setStatusFilter("in_progress"); setSearchQuery(""); }}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setStatusFilter("in_progress"); setSearchQuery(""); } }}
           style={{
             padding: "16px 20px",
             borderRadius: "16px",
@@ -189,6 +206,7 @@ export default function AssignedTasks() {
             alignItems: "center",
             gap: 14,
             borderLeft: "4px solid #0ea5e9",
+            cursor: "pointer",
           }}
         >
           <div
@@ -215,6 +233,11 @@ export default function AssignedTasks() {
 
         <div
           className="glass-card"
+          role="button"
+          tabIndex={0}
+          aria-label={`Show completed tasks`}
+          onClick={() => { setStatusFilter("completed"); setSearchQuery(""); }}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setStatusFilter("completed"); setSearchQuery(""); } }}
           style={{
             padding: "16px 20px",
             borderRadius: "16px",
@@ -222,6 +245,7 @@ export default function AssignedTasks() {
             alignItems: "center",
             gap: 14,
             borderLeft: "4px solid #22c55e",
+            cursor: "pointer",
           }}
         >
           <div
