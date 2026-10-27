@@ -138,7 +138,7 @@ export default function FacultyResults() {
           .then(({ data }) => setEvents(data.items || []))
           .catch(() => {});
       }
-    }, 4000);
+    }, 15000);
 
     return () => clearInterval(interval);
   }, [selectedEventId]);
