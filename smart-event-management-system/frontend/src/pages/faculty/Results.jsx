@@ -484,10 +484,10 @@ export default function FacultyResults() {
   };
 
   // PDF Export Handlers
-  const handleExportResultsPDF = () => {
+  const handleExportResultsPDF = async () => {
     if (!selectedEvent) return;
     try {
-      generateResultsReportPDF({ event: selectedEvent, results });
+      await generateResultsReportPDF({ event: selectedEvent, results });
       toast.success("Results PDF downloaded!");
     } catch (err) {
       console.error("Results PDF export error:", err);
@@ -495,10 +495,10 @@ export default function FacultyResults() {
     }
   };
 
-  const handleExportWinnersPDF = () => {
+  const handleExportWinnersPDF = async () => {
     if (!selectedEvent) return;
     try {
-      generateWinnersReportPDF({ event: selectedEvent, results });
+      await generateWinnersReportPDF({ event: selectedEvent, results });
       toast.success("Winners PDF downloaded!");
     } catch (err) {
       console.error("Winners PDF export error:", err);
