@@ -165,7 +165,7 @@ export default function FacultyList() {
     }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!faculty || faculty.length === 0) {
       toast.error("No faculty records available to export");
       return;
@@ -199,7 +199,8 @@ export default function FacultyList() {
       joined: formatDate(f.created_at) || "N/A",
     }));
 
-    generateCustomReportPDF({
+    try {
+      await generateCustomReportPDF({
       title: "Faculty Directory & Academic Staff",
       subtitle: "Official Institutional Roster & Department Task Allocation Records",
       filename,
@@ -217,9 +218,12 @@ export default function FacultyList() {
       ],
       columns: reportColumns,
       data: reportData,
-    });
-
-    toast.success(`Exported ${faculty.length} faculty profiles to PDF`);
+      });
+      toast.success(`Exported ${faculty.length} faculty profiles to PDF`);
+    } catch (err) {
+      console.error("Faculty directory PDF export failed:", err);
+      toast.error(err?.message || "Could not download faculty directory PDF.");
+    }
   };
 
   return (
