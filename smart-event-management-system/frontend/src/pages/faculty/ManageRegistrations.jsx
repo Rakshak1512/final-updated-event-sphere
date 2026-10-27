@@ -273,6 +273,11 @@ export default function ManageRegistrations() {
       (r.status === "approved" || r.status === "attended" || r.status === "completed") &&
       r.status !== "cancelled"
   ).length;
+  const allApproved = regs.filter(
+    (r) =>
+      (r.status === "approved" || r.status === "attended" || r.status === "completed") &&
+      r.status !== "cancelled"
+  );
   const attendedCount = allAttended.length;
   const remainingSeats = Math.max(0, totalCapacity - registeredCount);
 
