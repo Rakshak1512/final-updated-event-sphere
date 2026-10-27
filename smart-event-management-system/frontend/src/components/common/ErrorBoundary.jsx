@@ -1,7 +1,7 @@
 import React from "react";
 import { FiAlertTriangle, FiRefreshCw, FiHome } from "react-icons/fi";
 
-export default class ErrorBoundary extends React.Component {
+export class ErrorBoundaryBase extends React.Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null, errorInfo: null };
@@ -162,4 +162,12 @@ export default class ErrorBoundary extends React.Component {
 
     return this.props.children;
   }
+}
+
+
+// Keep boundary state scoped to the active route. Changing routes remounts the
+// boundary so a crashed page cannot leave the entire dashboard stuck on its fallback.
+export default function ErrorBoundary(props) {
+  const location = useLocation();
+  return <ErrorBoundaryBase key={location.pathname} {...props} location={location} />;
 }
