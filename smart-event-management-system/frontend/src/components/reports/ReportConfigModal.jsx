@@ -165,7 +165,7 @@ export default function ReportConfigModal({
 
       const safeFilename = `EventSphere_${title.replace(/[^a-zA-Z0-9_-]/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`;
 
-      generateCustomReportPDF({
+      await generateCustomReportPDF({
         title,
         subtitle,
         headers: data.headers || [],
