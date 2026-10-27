@@ -20,12 +20,13 @@ import {
   FiExternalLink,
   FiTag,
   FiCheckCircle,
+  FiStar,
 } from "react-icons/fi";
 import { BsQrCode } from "react-icons/bs";
 import EmptyState from "../../components/ui/EmptyState.jsx";
 import Modal from "../../components/ui/Modal.jsx";
 import { SkeletonGrid } from "../../components/ui/Loader.jsx";
-import { registrationService } from "../../api/services.js";
+import { feedbackService, registrationService } from "../../api/services.js";
 import { fileUrl, formatDate, statusBadgeClass } from "../../utils/format.js";
 import QRCodeDisplay from "../../components/common/QRCodeDisplay.jsx";
 import EventImage from "../../components/common/EventImage.jsx";
@@ -75,6 +76,11 @@ export default function MyRegistrations() {
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [exportingReport, setExportingReport] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [myFeedbacks, setMyFeedbacks] = useState([]);
   const { addListener } = useRealtime();
 
   const load = () => {
@@ -101,6 +107,39 @@ export default function MyRegistrations() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    feedbackService.getMyFeedbacks()
+      .then(({ data }) => setMyFeedbacks(Array.isArray(data) ? data : []))
+      .catch((err) => console.error("Could not load submitted reviews:", err));
+  }, []);
+
+  const submitEventReview = async () => {
+    const eventId = Number(reviewTarget?.event_id || reviewTarget?.event?.id);
+    if (!Number.isFinite(eventId) || eventId <= 0) {
+      toast.error("This registration is missing its event ID.");
+      return;
+    }
+    setReviewSubmitting(true);
+    try {
+      const { data } = await feedbackService.submit({
+        event_id: eventId,
+        rating: reviewRating,
+        comment: reviewComment.trim(),
+      });
+      setMyFeedbacks((previous) => [data, ...previous.filter((item) => Number(item.event_id) !== eventId)]);
+      setReviewTarget(null);
+      setReviewComment("");
+      setReviewRating(5);
+      toast.success("Thanks! Your event review has been submitted.");
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || err?.message || "Could not submit your review.");
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const reviewedEventIds = new Set(myFeedbacks.map((item) => Number(item.event_id)));
 
   // Real-time synchronization for student's registrations
   useEffect(() => {
@@ -697,6 +736,28 @@ export default function MyRegistrations() {
                       <FiDownload size={13} /> Slip
                     </button>
 
+                    {!isCancelled && (
+                      reviewedEventIds.has(Number(r.event_id || ev.id)) ? (
+                        <span className="btn btn-outline btn-sm" style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "#10b981", cursor: "default" }} title="Review already submitted">
+                          <FiStar size={13} /> Reviewed
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          onClick={() => {
+                            setReviewTarget(r);
+                            setReviewRating(5);
+                            setReviewComment("");
+                          }}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
+                          title="Rate and review this event"
+                        >
+                          <FiStar size={13} /> Review
+                        </button>
+                      )
+                    )}
+
                     {!isCancelled && !isAttended && isUpcoming(ev, rawStatus) && (
                       <button
                         type="button"
@@ -933,6 +994,60 @@ export default function MyRegistrations() {
             </button>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={Boolean(reviewTarget)}
+        onClose={() => !reviewSubmitting && setReviewTarget(null)}
+        title={`Review ${reviewTarget?.event?.title || "Event"}`}
+        width={520}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <p style={{ color: "var(--text-secondary)", fontSize: 13, margin: 0 }}>
+            Rate your experience. Faculty coordinators and administrators can see your rating and comment in the event review report.
+          </p>
+          <div>
+            <label style={{ display: "block", fontWeight: 700, marginBottom: 8 }}>Your rating</label>
+            <div role="radiogroup" aria-label="Event rating" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {[1, 2, 3, 4, 5].map((rating) => (
+                <button
+                  key={rating}
+                  type="button"
+                  role="radio"
+                  aria-checked={reviewRating === rating}
+                  onClick={() => setReviewRating(rating)}
+                  disabled={reviewSubmitting}
+                  title={`${rating} out of 5 stars`}
+                  style={{ border: "none", background: "transparent", cursor: "pointer", padding: 4, color: rating <= reviewRating ? "#f59e0b" : "var(--text-muted)", display: "flex", alignItems: "center", gap: 2 }}
+                >
+                  <FiStar size={25} fill={rating <= reviewRating ? "currentColor" : "none"} />
+                </button>
+              ))}
+              <span style={{ alignSelf: "center", fontSize: 13, color: "var(--text-secondary)" }}>{reviewRating}/5</span>
+            </div>
+          </div>
+          <div>
+            <label htmlFor="event-review-comment" style={{ display: "block", fontWeight: 700, marginBottom: 8 }}>Comment (optional)</label>
+            <textarea
+              id="event-review-comment"
+              className="form-input"
+              rows={4}
+              maxLength={1000}
+              value={reviewComment}
+              onChange={(e) => setReviewComment(e.target.value)}
+              placeholder="What did you like? What could be improved?"
+              disabled={reviewSubmitting}
+              style={{ width: "100%", resize: "vertical" }}
+            />
+            <small style={{ color: "var(--text-muted)" }}>{reviewComment.length}/1000 characters</small>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <button type="button" className="btn btn-outline" onClick={() => setReviewTarget(null)} disabled={reviewSubmitting}>Cancel</button>
+            <button type="button" className="btn btn-primary" onClick={submitEventReview} disabled={reviewSubmitting}>
+              {reviewSubmitting ? "Submitting..." : "Submit Review"}
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {/* CANCEL REGISTRATION MODAL */}
