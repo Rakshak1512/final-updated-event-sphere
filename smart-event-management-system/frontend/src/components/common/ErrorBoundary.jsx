@@ -1,5 +1,6 @@
 import React from "react";
 import { FiAlertTriangle, FiRefreshCw, FiHome } from "react-icons/fi";
+import { useLocation } from "react-router-dom";
 
 export class ErrorBoundaryBase extends React.Component {
   constructor(props) {
