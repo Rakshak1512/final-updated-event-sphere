@@ -73,11 +73,16 @@ export default function VolunteerApprovals() {
 
   useEffect(() => {
     loadVolunteerApprovals(true);
-    // Background polling every 10 seconds for real-time incoming volunteer registrations
+    // Poll less often while visible; pause network work in background tabs.
     const interval = setInterval(() => {
-      loadVolunteerApprovals(false);
-    }, 10000);
-    return () => clearInterval(interval);
+      if (!document.hidden) loadVolunteerApprovals(false);
+    }, 20000);
+    const handleFocus = () => loadVolunteerApprovals(false);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, [loadVolunteerApprovals]);
 
   // Handle Approve
