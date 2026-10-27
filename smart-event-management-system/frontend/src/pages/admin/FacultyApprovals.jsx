@@ -72,11 +72,16 @@ export default function FacultyApprovals() {
 
   useEffect(() => {
     loadFacultyApprovals(true);
-    // Background polling every 10 seconds for real-time incoming faculty registrations
+    // Poll less often while visible; pause network work in background tabs.
     const interval = setInterval(() => {
-      loadFacultyApprovals(false);
-    }, 10000);
-    return () => clearInterval(interval);
+      if (!document.hidden) loadFacultyApprovals(false);
+    }, 20000);
+    const handleFocus = () => loadFacultyApprovals(false);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, [loadFacultyApprovals]);
 
   // Handle Approve
