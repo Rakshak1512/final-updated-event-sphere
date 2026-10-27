@@ -29,6 +29,7 @@ import { SkeletonGrid, SkeletonRow } from "../../components/ui/Loader.jsx";
 import PageTransition from "../../components/common/PageTransition.jsx";
 import { eventService, registrationService } from "../../api/services.js";
 import { useRealtime } from "../../context/RealtimeContext.jsx";
+import { formatDate } from "../../utils/format.js";
 import { slugifyFilename } from "../../utils/exportUtils.js";
 import { generateCustomReportPDF } from "../../utils/pdfReportGenerator.js";
 import { useAuth } from "../../context/AuthContext.jsx";
