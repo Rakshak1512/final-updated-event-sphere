@@ -522,7 +522,7 @@ export default function AdminReports() {
         orientation: "landscape",
       });
 
-      generateCustomReportPDF({
+      await generateCustomReportPDF({
         title: defaultTitle,
         subtitle: defaultSubtitle,
         headers: data.headers || [],
