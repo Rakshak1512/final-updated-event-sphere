@@ -1,5 +1,33 @@
 import api, { API_BASE_URL } from "./axios.js";
+import jsPDF from "jspdf";
 import { downloadBlobOrFile } from "../utils/fileDownload.js";
+
+const readBlobAsDataUrl = (blob) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(reader.result);
+  reader.onerror = () => reject(new Error("Could not read the certificate image."));
+  reader.readAsDataURL(blob);
+});
+
+const hasPdfSignature = async (blob) => {
+  const signature = new TextDecoder().decode(await blob.slice(0, 5).arrayBuffer());
+  return signature === "%PDF-";
+};
+
+const convertImageCertificateToPdf = async (imageBlob) => {
+  const dataUrl = await readBlobAsDataUrl(imageBlob);
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+  const imageInfo = doc.getImageProperties(dataUrl);
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 30;
+  const scale = Math.min((pageWidth - margin * 2) / imageInfo.width, (pageHeight - margin * 2) / imageInfo.height);
+  const width = imageInfo.width * scale;
+  const height = imageInfo.height * scale;
+  const format = String(imageInfo.fileType || "").toUpperCase() === "PNG" ? "PNG" : "JPEG";
+  doc.addImage(dataUrl, format, (pageWidth - width) / 2, (pageHeight - height) / 2, width, height);
+  return doc.output("blob");
+};
 
 /* ---------------- Auth ---------------- */
 export const authService = {
@@ -121,9 +149,14 @@ export const certificateService = {
     const response = await api.get(`/certificates/${id}/download`, {
       responseType: "blob",
     });
-    const headerType = response.headers?.["content-type"];
-    const type = headerType && headerType !== "application/octet-stream" ? headerType : "application/pdf";
-    return new Blob([response.data], { type });
+    const headerType = response.headers?.["content-type"] || "";
+    const blob = response.data instanceof Blob ? response.data : new Blob([response.data]);
+    // Older records can contain PDF bytes with an image MIME type. Trust bytes.
+    if (await hasPdfSignature(blob)) {
+      return new Blob([blob], { type: "application/pdf" });
+    }
+    const type = headerType && headerType !== "application/octet-stream" ? headerType : (blob.type || "application/pdf");
+    return new Blob([blob], { type });
   },
 
   downloadFile: async (id, title = "certificate") => {
@@ -131,16 +164,33 @@ export const certificateService = {
       responseType: "blob",
     });
     const headerType = response.headers?.["content-type"] || "";
-    if (headerType.includes("application/json")) {
-      const text = await response.data.text();
-      const parsed = JSON.parse(text);
-      throw new Error(parsed.detail || "Failed to download certificate");
+    const blob = response.data instanceof Blob ? response.data : new Blob([response.data]);
+
+    if (headerType.includes("application/json") || headerType.includes("text/html")) {
+      const text = await blob.text();
+      let message = "The server did not return a valid certificate file. Please try again.";
+      try {
+        const parsed = JSON.parse(text);
+        message = parsed.detail || message;
+      } catch {
+        // Keep the safe fallback for HTML or malformed error responses.
+      }
+      throw new Error(message);
     }
-    const isImage = headerType.startsWith("image/") || (response.data.type && response.data.type.startsWith("image/"));
-    const ext = isImage ? (headerType.includes("png") ? "png" : "jpg") : "pdf";
-    const mimeType = isImage ? (headerType || "image/jpeg") : "application/pdf";
-    const filename = `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}.${ext}`;
-    return await downloadBlobOrFile(response.data, filename, mimeType);
+
+    const safeTitle = String(title || "certificate").replace(/[^a-zA-Z0-9_-]/g, "_");
+    // Trust the actual bytes if an old backend response has a stale image header.
+    if (await hasPdfSignature(blob)) {
+      return await downloadBlobOrFile(blob, `${safeTitle}.pdf`, "application/pdf");
+    }
+
+    const isImage = headerType.startsWith("image/") || (blob.type && blob.type.startsWith("image/"));
+    if (isImage) {
+      const pdfBlob = await convertImageCertificateToPdf(blob);
+      return await downloadBlobOrFile(pdfBlob, `${safeTitle}.pdf`, "application/pdf");
+    }
+
+    throw new Error("This certificate is neither a valid PDF nor a supported image.");
   },
 
   facultyUploaded: () => api.get("/certificates/faculty/uploaded"),
