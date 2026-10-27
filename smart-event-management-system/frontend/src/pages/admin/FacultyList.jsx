@@ -101,7 +101,7 @@ export default function FacultyList() {
       if (!document.hidden) {
         loadFaculty(false);
       }
-    }, 5000);
+    }, 15000);
 
     const handleFocus = () => loadFaculty(false);
     window.addEventListener("focus", handleFocus);
