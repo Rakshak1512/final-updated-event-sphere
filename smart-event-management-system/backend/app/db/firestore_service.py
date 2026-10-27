@@ -3061,9 +3061,9 @@ def get_event_feedback_summary(event_id: int) -> dict:
 
 
 def get_faculty_feedback_summary(faculty_id: int) -> dict:
+    # Never leak feedback from unrelated faculty events. Admins use the
+    # dedicated event report endpoint to review institution-wide feedback.
     events = get_events_by_organizer(faculty_id)
-    if not events:
-        events = get_all_events()
 
     all_feedbacks = []
     for ev in events:
@@ -3078,7 +3078,7 @@ def get_faculty_feedback_summary(faculty_id: int) -> dict:
         total_rating += f.rating
 
     total_responses = len(all_feedbacks)
-    avg = round(total_rating / max(1, total_responses), 1) if total_responses > 0 else 4.8
+    avg = round(total_rating / total_responses, 1) if total_responses > 0 else 0.0
 
     return {
         "total_events": len(events),
