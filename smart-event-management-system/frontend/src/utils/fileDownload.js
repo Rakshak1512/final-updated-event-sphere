@@ -52,6 +52,15 @@ export async function downloadBlobOrFile(blobData, filename = "document.pdf", mi
     throw new Error("The generated file is empty.");
   }
 
+  // EventSphere report/export downloads are PDF-only. Prevent HTML/JSON error
+  // responses from being silently saved with a .pdf extension.
+  if (mimeType === "application/pdf") {
+    const signature = new TextDecoder().decode(await blob.slice(0, 5).arrayBuffer());
+    if (signature !== "%PDF-") {
+      throw new Error("The server did not return a valid PDF file. Please retry the download.");
+    }
+  }
+
   const safeFilename = (filename || "document.pdf").replace(/[/\\?%*:|"<>]/g, "_");
   const isMobile = isMobileDevice();
 
