@@ -457,21 +457,18 @@ export default function FacultyRegistrations() {
     }
   };
 
-  // Quick 1-click Download for any event directly from the catalog
+  // Use the server-generated official report so the event's real data and PDF
+  // response are handled consistently with the Event Review Report download.
   const handleQuickDownloadEventPDF = async (ev) => {
+    const toastId = `quick-pdf-${ev.id}`;
     try {
-      toast.loading(`Fetching registrations for ${ev.title}...`, { id: `quick-pdf-${ev.id}` });
-      const { data: eventRegs } = await registrationService.forEvent(ev.id);
-      const list = eventRegs || [];
-      await generateRegistrationReportPDF({
-        event: ev,
-        registrations: list,
-        statusFilter: "active",
-      });
-      toast.success(`Downloaded registration report for ${ev.title} (${list.length} records)!`, { id: `quick-pdf-${ev.id}` });
+      toast.loading(`Generating report for ${ev.title}...`, { id: toastId });
+      await eventService.downloadReportPdf(ev.id, ev.title);
+      toast.success(`Downloaded registration report for ${ev.title}.`, { id: toastId });
     } catch (err) {
       console.error("Quick PDF download error:", err);
-      toast.error(`Could not download PDF for ${ev.title}.`, { id: `quick-pdf-${ev.id}` });
+      const detail = err?.response?.data?.detail || err?.message || "Please retry the download.";
+      toast.error(`Could not download PDF for ${ev.title}: ${detail}`, { id: toastId });
     }
   };
 
