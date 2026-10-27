@@ -146,6 +146,8 @@ export default function EventImage({
           src={cleanUrl}
           alt={alt}
           loading="lazy"
+          decoding="async"
+          draggable={false}
           onLoad={() => setLoaded(true)}
           onError={() => setHasError(true)}
           whileHover={hoverZoom ? { scale: 1.06 } : undefined}
