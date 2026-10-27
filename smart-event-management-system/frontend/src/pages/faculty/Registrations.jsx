@@ -163,7 +163,7 @@ export default function FacultyRegistrations() {
           })
           .catch(() => {});
       }
-    }, 4000);
+    }, 15000);
 
     return () => clearInterval(interval);
   }, [selectedEventId, isStaff, isEventManageable]);
